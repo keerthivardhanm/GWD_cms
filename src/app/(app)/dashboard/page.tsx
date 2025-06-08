@@ -5,6 +5,7 @@ import { KeyMetricCard } from "@/components/dashboard/KeyMetricsCard";
 import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart";
 import { KeepNotes } from "@/components/dashboard/KeepNotes";
 import { RecentActivityFeed } from "@/components/dashboard/RecentActivityFeed";
+import { QuickActions } from "@/components/dashboard/QuickActions"; // Added QuickActions import
 import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Package, Settings, FileClock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,8 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Dashboard" description="Overview of your Apollo CMS activity." />
+
+      <QuickActions /> {/* Added QuickActions component here */}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <KeyMetricCard title="Total Pages" value="125" icon={FileText} description="+5 this month" />
@@ -162,4 +165,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
