@@ -56,12 +56,12 @@ const SidebarMenuItemContent = ({ item, currentPath }: { item: NavItem; currentP
   }
 
   return (
-    <Link href={item.href} legacyBehavior passHref>
-      <SidebarMenuButton isActive={isActive} tooltip={item.label} className="text-sm">
+    <SidebarMenuButton asChild isActive={isActive} tooltip={item.label} className="text-sm">
+      <Link href={item.href}>
         <Icon />
         <span>{item.label}</span>
-      </SidebarMenuButton>
-    </Link>
+      </Link>
+    </SidebarMenuButton>
   );
 };
 
@@ -99,12 +99,12 @@ export function AppSidebar() {
             <SidebarMenuSub>
               {item.subItems.map((subItem, subIndex) => (
                 <SidebarMenuSubItem key={`${subItem.href}-${subIndex}`}>
-                  <Link href={subItem.href} legacyBehavior passHref>
-                    <SidebarMenuSubButton isActive={pathname.startsWith(subItem.href)}>
+                  <SidebarMenuSubButton asChild isActive={pathname.startsWith(subItem.href)}>
+                    <Link href={subItem.href}>
                       <subItem.icon />
                       <span>{subItem.label}</span>
-                    </SidebarMenuSubButton>
-                  </Link>
+                    </Link>
+                  </SidebarMenuSubButton>
                 </SidebarMenuSubItem>
               ))}
             </SidebarMenuSub>
