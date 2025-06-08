@@ -1,11 +1,14 @@
+
+import Link from 'next/link';
 import { PageHeader } from "@/components/shared/PageHeader";
 import { KeyMetricCard } from "@/components/dashboard/KeyMetricsCard";
 import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart";
 import { KeepNotes } from "@/components/dashboard/KeepNotes";
 import { RecentActivityFeed } from "@/components/dashboard/RecentActivityFeed";
-import { FileText, Files, Grid, BarChart3, Users, ExternalLink } from "lucide-react";
+import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Package, Settings, FileClock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const gaData = {
   mostVisited: [
@@ -28,6 +31,14 @@ const userEngagementData = [
   { date: "2024-07-08", activeUsers: 180, comments: 25 },
   { date: "2024-07-15", activeUsers: 165, comments: 18 },
   { date: "2024-07-22", activeUsers: 200, comments: 30 },
+];
+
+const recentlyModifiedData = [
+  { id: "rm1", title: "Homepage Q3 Refresh", type: "Page", lastModified: "July 30, 2024", editor: "Alice W.", url: "/pages", icon: FileText },
+  { id: "rm2", title: "New Product: Wireless Buds", type: "Product", lastModified: "July 29, 2024", editor: "Bob B.", url: "/content-files", icon: Package },
+  { id: "rm3", title: "Summer Sale Banner", type: "Block", lastModified: "July 29, 2024", editor: "Alice W.", url: "/content-blocks", icon: Grid },
+  { id: "rm4", title: "About Us - Team Section", type: "Page", lastModified: "July 28, 2024", editor: "Charlie B.", url: "/pages", icon: FileText },
+  { id: "rm5", title: "Site Configuration Update", type: "Settings", lastModified: "July 27, 2024", editor: "Admin", url: "/settings", icon: Settings },
 ];
 
 
@@ -108,10 +119,47 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-        <KeepNotes />
+        
+        <div className="space-y-6 lg:col-span-1">
+            <KeepNotes />
+            <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <FileClock className="h-5 w-5" />
+                        Recently Modified Content
+                    </CardTitle>
+                    <CardDescription>Quick access to recently updated items in the CMS.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-2">
+                        {recentlyModifiedData.map((item) => {
+                          const ItemIcon = item.icon;
+                          return (
+                            <div key={item.id} className="flex items-center justify-between py-3 border-b last:border-b-0">
+                                <div className="flex items-center gap-3">
+                                <ItemIcon className="h-5 w-5 text-muted-foreground" />
+                                <div>
+                                    <Link href={item.url} className="font-medium text-sm hover:underline">{item.title}</Link>
+                                    <p className="text-xs text-muted-foreground">
+                                    <Badge variant="outline" className="mr-1.5 text-xs">{item.type}</Badge>
+                                    Modified by {item.editor} &bull; {item.lastModified}
+                                    </p>
+                                </div>
+                                </div>
+                                <Button variant="ghost" size="sm" asChild className="text-xs shrink-0">
+                                <Link href={item.url}><Edit2 className="mr-1 h-3 w-3" /> Edit</Link>
+                                </Button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
       </div>
 
       <RecentActivityFeed />
     </div>
   );
 }
+
