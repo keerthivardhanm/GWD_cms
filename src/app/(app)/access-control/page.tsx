@@ -1,27 +1,34 @@
 
+"use client";
+
+import React, { useEffect, useState } from 'react';
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PlusCircle, Search, MoreHorizontal, Edit2, Trash2, UserPlus, Shield, KeyRound, Users } from "lucide-react"; // Added Users
+import { PlusCircle, MoreHorizontal, Edit2, Trash2, UserPlus, Shield, KeyRound, Users, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { db } from '@/lib/firebase';
+import { collection, getDocs, QueryDocumentSnapshot, DocumentData, Timestamp } from 'firebase/firestore';
 
-const usersData = [
-  { id: "u1", name: "Alice Wonderland", email: "alice@example.com", role: "Admin", lastLogin: "2024-07-28" },
-  { id: "u2", name: "Bob The Builder", email: "bob@example.com", role: "Editor", lastLogin: "2024-07-27" },
-  { id: "u3", name: "Charlie Brown", email: "charlie@example.com", role: "Viewer", lastLogin: "2024-07-29" },
-  { id: "u4", name: "Diana Prince", email: "diana@example.com", role: "Editor", lastLogin: "2024-07-26" },
-];
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  lastLogin?: string; // Kept optional as in original mock
+}
 
-const rolesData = [
-    { id: "r1", name: "Admin", description: "Full access to all features and settings.", permissions: ["manage_users", "manage_settings", "manage_content", "manage_schemas"] },
-    { id: "r2", name: "Editor", description: "Can create, edit, and publish content.", permissions: ["manage_content"] },
-    { id: "r3", name: "Viewer", description: "Can only view content, no editing rights.", permissions: ["view_content"] },
-];
+interface Role {
+  id: string;
+  name: string;
+  description: string;
+  permissions: string[];
+}
 
 const allPermissions = [
     { id: "manage_users", label: "Manage Users" },
@@ -33,8 +40,66 @@ const allPermissions = [
     { id: "view_audit_logs", label: "View Audit Logs" },
 ];
 
-
 export default function AccessControlPage() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [loadingRoles, setLoadingRoles] = useState(true);
+  const [errorUsers, setErrorUsers] = useState<string | null>(null);
+  const [errorRoles, setErrorRoles] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoadingUsers(true);
+      setErrorUsers(null);
+      try {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        const usersData = querySnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || 'Unknown User',
+            email: data.email || 'no-email@example.com',
+            role: data.role || 'Viewer',
+            lastLogin: data.lastLogin instanceof Timestamp ? data.lastLogin.toDate().toLocaleDateString() : data.lastLogin,
+          } as User;
+        });
+        setUsers(usersData);
+      } catch (err) {
+        console.error("Error fetching users:", err);
+        setErrorUsers("Failed to load users. Please try again later.");
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    const fetchRoles = async () => {
+      setLoadingRoles(true);
+      setErrorRoles(null);
+      try {
+        const querySnapshot = await getDocs(collection(db, "roles"));
+        const rolesData = querySnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || 'Unknown Role',
+            description: data.description || '',
+            permissions: Array.isArray(data.permissions) ? data.permissions : [],
+          } as Role;
+        });
+        setRoles(rolesData);
+      } catch (err) {
+        console.error("Error fetching roles:", err);
+        setErrorRoles("Failed to load roles. Please try again later.");
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    fetchUsers();
+    fetchRoles();
+  }, []);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -58,39 +123,51 @@ export default function AccessControlPage() {
             <div className="p-4 border-b">
                 <Input type="search" placeholder="Search users by name or email..." className="w-full" />
             </div>
-            <Table>
-                <TableHeader>
-                <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="hidden sm:table-cell">Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-                </TableHeader>
-                <TableBody>
-                {usersData.map((user) => (
-                    <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell className="hidden sm:table-cell text-muted-foreground">{user.email}</TableCell>
-                    <TableCell>
-                        <Badge variant={user.role === "Admin" ? "destructive" : "secondary"}>{user.role}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                        <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem><Edit2 className="mr-2 h-4 w-4" /> Edit User</DropdownMenuItem>
-                            <DropdownMenuItem><KeyRound className="mr-2 h-4 w-4" /> Change Role</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Remove User</DropdownMenuItem>
-                        </DropdownMenuContent>
-                        </DropdownMenu>
-                    </TableCell>
+            {loadingUsers && (
+                <div className="flex items-center justify-center p-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="ml-2">Loading users...</p>
+                </div>
+            )}
+            {errorUsers && <p className="p-4 text-center text-destructive">{errorUsers}</p>}
+            {!loadingUsers && !errorUsers && users.length === 0 && (
+                <p className="p-4 text-center text-muted-foreground">No users found.</p>
+            )}
+            {!loadingUsers && !errorUsers && users.length > 0 && (
+                <Table>
+                    <TableHeader>
+                    <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead className="hidden sm:table-cell">Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                ))}
-                </TableBody>
-            </Table>
+                    </TableHeader>
+                    <TableBody>
+                    {users.map((user) => (
+                        <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-muted-foreground">{user.email}</TableCell>
+                        <TableCell>
+                            <Badge variant={user.role === "Admin" ? "destructive" : "secondary"}>{user.role}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                            <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem><Edit2 className="mr-2 h-4 w-4" /> Edit User</DropdownMenuItem>
+                                <DropdownMenuItem><KeyRound className="mr-2 h-4 w-4" /> Change Role</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Remove User</DropdownMenuItem>
+                            </DropdownMenuContent>
+                            </DropdownMenu>
+                        </TableCell>
+                        </TableRow>
+                    ))}
+                    </TableBody>
+                </Table>
+            )}
             </CardContent>
         </Card>
 
@@ -100,7 +177,17 @@ export default function AccessControlPage() {
             <CardDescription>Define roles and assign permissions to them.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                {rolesData.map(role => (
+                {loadingRoles && (
+                    <div className="flex items-center justify-center p-10">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <p className="ml-2">Loading roles...</p>
+                    </div>
+                )}
+                {errorRoles && <p className="p-4 text-center text-destructive">{errorRoles}</p>}
+                {!loadingRoles && !errorRoles && roles.length === 0 && (
+                     <p className="p-4 text-center text-muted-foreground">No roles found.</p>
+                )}
+                {!loadingRoles && !errorRoles && roles.map(role => (
                     <Card key={role.id} className="bg-muted/30">
                         <CardHeader className="pb-2">
                             <div className="flex justify-between items-center">
@@ -117,7 +204,7 @@ export default function AccessControlPage() {
                                         <Checkbox 
                                             id={`${role.id}-${perm.id}`} 
                                             checked={role.permissions.includes(perm.id)}
-                                            disabled={role.name === "Admin"} // Admins typically have all permissions
+                                            disabled={role.name === "Admin"} 
                                         />
                                         <Label htmlFor={`${role.id}-${perm.id}`} className="text-xs font-normal cursor-pointer">{perm.label}</Label>
                                     </div>
