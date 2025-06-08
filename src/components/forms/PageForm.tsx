@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -10,6 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Page } from '@/app/(app)/pages/page'; // Import Page type
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { useToast } from "@/hooks/use-toast";
 
 export const pageStatuses = ["Draft", "Published", "Review"] as const;
 export type PageStatus = typeof pageStatuses[number];
@@ -39,22 +42,94 @@ const generateSlug = (title: string) => {
 };
 
 export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
-  const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch } = useForm<PageFormValues>({
+  const { toast } = useToast();
+  const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch, setError, clearErrors } = useForm<PageFormValues>({
     resolver: zodResolver(pageFormSchema),
     defaultValues: {
       title: initialData?.title || '',
       slug: initialData?.slug || '',
       status: initialData?.status || 'Draft',
-      author: initialData?.author || 'Admin',
+      author: initialData?.author || 'Admin', // Consider fetching current user as default
     },
   });
 
   const watchedTitle = watch("title");
-  React.useEffect(() => {
-    if (watchedTitle && !initialData?.slug) { // Only auto-generate slug for new pages or if slug was empty
+  const watchedSlug = watch("slug");
+  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
+  const [slugError, setSlugCustomError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (watchedTitle && !initialData?.slug && !initialData?.title) { // Only auto-generate slug for new pages if title is typed first
       setValue("slug", generateSlug(watchedTitle), { shouldValidate: true });
     }
-  }, [watchedTitle, setValue, initialData?.slug]);
+  }, [watchedTitle, setValue, initialData]);
+
+  // Debounced slug check
+  const checkSlugUniqueness = useCallback(
+    async (slugToCheck: string) => {
+      if (!slugToCheck) return;
+      if (initialData && initialData.slug === slugToCheck) {
+        clearErrors("slug");
+        setSlugCustomError(null);
+        return; // Slug hasn't changed from initial data during edit
+      }
+
+      setIsCheckingSlug(true);
+      setSlugCustomError(null);
+      clearErrors("slug");
+
+      try {
+        const q = query(collection(db, "pages"), where("slug", "==", slugToCheck));
+        const querySnapshot = await getDocs(q);
+        
+        let slugIsTaken = false;
+        if (!querySnapshot.empty) {
+          // If editing, check if the found slug belongs to the current page
+          if (initialData) {
+            querySnapshot.forEach(doc => {
+              if (doc.id !== initialData.id) {
+                slugIsTaken = true;
+              }
+            });
+          } else {
+            // If creating, any match means it's taken
+            slugIsTaken = true;
+          }
+        }
+
+        if (slugIsTaken) {
+          setError("slug", { type: "manual", message: "This slug is already in use. Please choose another." });
+          setSlugCustomError("This slug is already in use. Please choose another.");
+        } else {
+           clearErrors("slug"); // Clear schema validation if custom is ok
+           setSlugCustomError(null);
+        }
+      } catch (error) {
+        console.error("Error checking slug uniqueness:", error);
+        toast({
+          title: "Error",
+          description: "Could not verify slug uniqueness. Please try again.",
+          variant: "destructive",
+        });
+        // Optionally set an error state here
+      } finally {
+        setIsCheckingSlug(false);
+      }
+    },
+    [initialData, setError, clearErrors, toast]
+  );
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (watchedSlug && (pageFormSchema.shape.slug.safeParse(watchedSlug).success)) { // Only check if basic format is valid
+         checkSlugUniqueness(watchedSlug);
+      }
+    }, 500); // Debounce time: 500ms
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [watchedSlug, checkSlugUniqueness]);
 
 
   return (
@@ -69,6 +144,8 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
         <Label htmlFor="slug">Slug</Label>
         <Input id="slug" {...register("slug")} placeholder="e.g., my-awesome-page" />
         {errors.slug && <p className="text-sm text-destructive mt-1">{errors.slug.message}</p>}
+        {!errors.slug && slugError && <p className="text-sm text-destructive mt-1">{slugError}</p>}
+        {isCheckingSlug && <p className="text-sm text-muted-foreground mt-1">Checking slug availability...</p>}
         <p className="text-xs text-muted-foreground mt-1">The unique URL path for this page.</p>
       </div>
 
@@ -100,15 +177,13 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
       </div>
 
       <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting || isCheckingSlug}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" disabled={isSubmitting || isCheckingSlug || !!slugError || !!errors.slug}>
           {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Create Page')}
         </Button>
       </div>
     </form>
   );
 }
-
-    
