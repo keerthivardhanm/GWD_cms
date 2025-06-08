@@ -1,10 +1,7 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
 
 @layer base {
   :root {
@@ -87,5 +84,6 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    /* Removed font-family: Arial, Helvetica, sans-serif; to allow Tailwind's font-body to take precedence */
   }
 }

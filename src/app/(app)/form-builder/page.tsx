@@ -1,3 +1,5 @@
+
+"use client"; // Added "use client" for Checkbox interaction in preview
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { PlusCircle, Trash2, Save, FileText, Eye, ListChecks, Download, Settings2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox import
 
 // Example form fields - this would be dynamic based on schema/user input
 const formFields = [
@@ -125,7 +128,7 @@ export default function FormBuilderPage() {
                   {field.type === "checkbox" && (
                     <div className="flex items-center space-x-2 pt-1">
                       <Checkbox id={`preview-${field.id}`} defaultChecked={field.defaultChecked as boolean} />
-                       {/* <Label htmlFor={`preview-${field.id}`} className="font-normal">{field.label}</Label> */}
+                       <Label htmlFor={`preview-${field.id}`} className="font-normal">{field.label}</Label> 
                     </div>
                   )}
                    {field.type === "select" && (

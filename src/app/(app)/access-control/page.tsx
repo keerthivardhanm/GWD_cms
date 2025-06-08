@@ -1,10 +1,11 @@
+
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PlusCircle, Search, MoreHorizontal, Edit2, Trash2, UserPlus, Shield, KeyRound } from "lucide-react";
+import { PlusCircle, Search, MoreHorizontal, Edit2, Trash2, UserPlus, Shield, KeyRound, Users } from "lucide-react"; // Added Users
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";

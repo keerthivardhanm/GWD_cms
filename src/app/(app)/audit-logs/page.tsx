@@ -1,3 +1,8 @@
+
+"use client"; // Added "use client" for useState
+
+import React from "react"; // Added React import
+import type { DateRange } from "react-day-picker"; // Added DateRange import
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,8 +22,7 @@ const auditLogsData = [
 ];
 
 export default function AuditLogsPage() {
-  // Placeholder for date state
-  // const [date, setDate] = React.useState<DateRange | undefined>();
+  const [date, setDate] = React.useState<DateRange | undefined>();
 
   return (
     <div className="space-y-6">
@@ -72,7 +76,12 @@ export default function AuditLogsPage() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="range" numberOfMonths={2} />
+                  <Calendar 
+                    mode="range" 
+                    numberOfMonths={2}
+                    selected={date}
+                    onSelect={setDate}
+                  />
                 </PopoverContent>
               </Popover>
                <Button variant="outline" size="icon" aria-label="Apply Filters">

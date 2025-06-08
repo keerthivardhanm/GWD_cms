@@ -1,3 +1,4 @@
+
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PlusCircle, Search, MoreHorizontal, Edit2, Trash2, Layers, Clock, ShieldAlert } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card"; // Imported Card and CardContent
 
 const contentFilesData = [
   { id: "cf1", name: "Blog Post Schema", attachedTo: "Multiple Pages", blocks: 15, lastUpdated: "2024-07-28", versions: 5 },
@@ -96,10 +98,3 @@ export default function ContentFilesPage() {
     </div>
   );
 }
-
-const Card = ({ className, children }: { className?: string; children: React.ReactNode }) => (
-  <div className={`rounded-lg border bg-card text-card-foreground shadow-sm ${className}`}>{children}</div>
-);
-const CardContent = ({ className, children }: { className?: string; children: React.ReactNode }) => (
-  <div className={`p-6 pt-0 ${className}`}>{children}</div>
-);

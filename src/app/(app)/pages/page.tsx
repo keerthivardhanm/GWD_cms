@@ -1,3 +1,4 @@
+
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PlusCircle, Search, MoreHorizontal, Edit2, Copy, Trash2, Eye } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card"; // Imported Card and CardContent
 
 const pagesData = [
   { id: "1", title: "Homepage", slug: "/", status: "Published", lastModified: "2024-07-28", author: "Admin" },
@@ -95,14 +97,3 @@ export default function PagesManagementPage() {
     </div>
   );
 }
-
-// Minimal Card component to wrap table if not already globally available
-// This is typically part of shadcn/ui but defining minimally if needed standalone for this snippet
-// For a full app, ensure Card, CardContent are imported from "@/components/ui/card"
-const Card = ({ className, children }: { className?: string; children: React.ReactNode }) => (
-  <div className={`rounded-lg border bg-card text-card-foreground shadow-sm ${className}`}>{children}</div>
-);
-const CardContent = ({ className, children }: { className?: string; children: React.ReactNode }) => (
-  <div className={`p-6 pt-0 ${className}`}>{children}</div>
-);
-
