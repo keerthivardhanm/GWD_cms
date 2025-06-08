@@ -1,7 +1,7 @@
 
 "use client";
 
-import * as React from "react";
+import React from "react"; // Ensure React is imported
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bug, LogOut, Settings2, UserCircle } from "lucide-react";
@@ -33,6 +33,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
+
 
 const SidebarMenuItemContent = ({ item, currentPath }: { item: NavItem; currentPath: string }) => {
   const Icon = item.icon;
@@ -67,6 +69,21 @@ const SidebarMenuItemContent = ({ item, currentPath }: { item: NavItem; currentP
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { user, userData, logout } = useAuth(); // Get user and logout function
+
+  const getInitials = (nameOrEmail?: string | null) => {
+    if (!nameOrEmail) return "AU";
+    const parts = nameOrEmail.split('@')[0].split(/[.\s]/);
+    if (parts.length > 1) {
+      return `${parts[0][0]}${parts[parts.length -1][0]}`.toUpperCase();
+    }
+    return nameOrEmail.substring(0,2).toUpperCase();
+  };
+  
+  const displayName = userData?.name || user?.email || "User";
+  const displayEmail = userData?.email || user?.email || "user@example.com";
+  const avatarFallback = getInitials(displayName);
+
 
   const renderNavItems = (items: NavItem[]) => {
     return items.map((item, index) => {
@@ -139,28 +156,30 @@ export function AppSidebar() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex h-auto w-full items-center justify-start gap-2 p-2">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src="https://placehold.co/40x40.png" alt="Admin User" data-ai-hint="user avatar" />
-                  <AvatarFallback>AU</AvatarFallback>
+                  <AvatarImage src={user?.photoURL || "https://placehold.co/40x40.png"} alt={displayName} data-ai-hint="user avatar" />
+                  <AvatarFallback>{avatarFallback}</AvatarFallback>
                 </Avatar>
                 <div className="text-left group-data-[collapsible=icon]:hidden">
-                  <p className="text-sm font-medium">Admin User</p>
-                  <p className="text-xs text-muted-foreground">admin@example.com</p>
+                  <p className="text-sm font-medium">{displayName}</p>
+                  <p className="text-xs text-muted-foreground">{displayEmail}</p>
                 </div>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="right" align="start" className="w-56">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem disabled>
                 <UserCircle className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+                <span>Profile (soon)</span>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings2 className="mr-2 h-4 w-4" />
-                <span>Settings</span>
+              <DropdownMenuItem asChild>
+                <Link href="/settings">
+                    <Settings2 className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={logout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
               </DropdownMenuItem>

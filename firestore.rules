@@ -3,62 +3,61 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Default: Deny all reads and writes if no other rules match.
+    // Default deny all access unless explicitly allowed
     match /{document=**} {
       allow read, write: if false;
     }
 
     // Allow authenticated users to read and write to the 'users' collection.
-    // For specific user documents, only the owner can read/write.
-    // Admins might have broader access (can be added later).
+    // For more granular control, you might restrict writes to a user's own document,
+    // or allow admins to write to any user document.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      // Example for admin access (requires an 'role' field in user docs):
-      // allow list, get: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
-    }
-
-    // Allow authenticated users to read all pages.
-    // Allow authenticated users to create, update, and delete pages.
-    // More granular rules (e.g., only author or admin can update/delete) can be added.
-    match /pages/{pageId} {
       allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null;
-      // Example for author/admin control:
-      // allow update, delete: if request.auth != null && (
-      //   get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin' ||
-      //   resource.data.authorId == request.auth.uid // Assuming an 'authorId' field linked to auth.uid
-      // );
+      // Allow user to update their own profile, or admins to update any.
+      // This requires storing an 'admin' role or similar in user documents or custom claims.
+      allow write: if request.auth != null && (request.auth.uid == userId); // Example: user can write to their own doc
+                   // || (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin') // Example for admin
     }
 
-    // Allow authenticated users to read and write content blocks.
-    match /contentBlocks/{blockId} {
+    // Generic rule for other collections: only authenticated users can read/write.
+    // You should refine these rules based on your application's specific needs.
+    // For example, who can create pages? Who can edit specific content blocks?
+    
+    match /pages/{pageId} {
       allow read, write: if request.auth != null;
     }
 
-    // Allow authenticated users to read and write content files.
+    match /roles/{roleId} {
+      allow read: if request.auth != null;
+      // Writing roles should typically be restricted to administrators.
+      allow write: if request.auth != null; // Placeholder: refine for admin-only
+    }
+
+    match /contentBlocks/{blockId} {
+      allow read, write: if request.auth != null;
+    }
+    
     match /contentFiles/{fileId} {
       allow read, write: if request.auth != null;
     }
 
-    // Allow authenticated users to read and write media items.
     match /mediaItems/{itemId} {
+      // For media, read might be public if items are displayed on a public site.
+      // Write (upload/delete) should be authenticated, likely restricted.
       allow read, write: if request.auth != null;
     }
 
-    // Allow authenticated users to read audit logs.
-    // Creating audit logs is typically handled by backend functions or trusted server environments.
-    // For client-side creation (if absolutely necessary and secured), ensure appropriate checks.
     match /auditLogs/{logId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null; // Be cautious with client-side creation of audit logs.
+      allow read: if request.auth != null; // Admins might read logs
+      // Writing audit logs should ideally be done by a trusted server environment (e.g., Cloud Functions)
+      // or highly restricted to prevent tampering. For client-side, restrict heavily.
+      allow write: if request.auth != null; // Placeholder: refine
     }
-
-    // Allow authenticated users to read roles.
-    // Writing roles should typically be restricted to admins.
-    match /roles/{roleId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null; // Placeholder: Add admin check e.g. && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    
+    // Example for a settings collection, typically admin-only write access
+    match /settings/{settingId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null; // Placeholder: refine for admin-only
     }
   }
 }
