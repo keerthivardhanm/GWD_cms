@@ -199,19 +199,20 @@ export default function PagesManagementPage() {
   const handleFormSubmit = async (values: PageFormValues, pageType: PageType, contentData?: any) => {
     try {
       const dataToSave: any = {
-        ...values,
+        ...values, // title, slug, status, author, pageType from PageFormValues
         content: contentData || {},
         updatedAt: serverTimestamp(),
-        author: userData?.name || user?.email || 'System',
+        // author is already part of 'values' from the form (defaulted to current user)
       };
 
       if (editingPage) {
         const pageRef = doc(db, "pages", editingPage.id);
         if (editingPage.createdAt) {
-          dataToSave.createdAt = editingPage.createdAt; 
-        } else {
-           dataToSave.createdAt = serverTimestamp();
+            dataToSave.createdAt = editingPage.createdAt; 
+        } else if (!dataToSave.createdAt) { // Only set if not already present (e.g. from form values if it was a field)
+             dataToSave.createdAt = serverTimestamp(); // Should only happen if it was a new page somehow without createdAt
         }
+
         await updateDoc(pageRef, dataToSave);
         await logAuditEvent(user, userData, 'PAGE_UPDATED', 'Page', editingPage.id, values.title, { newValues: values, newContent: contentData });
         toast({
@@ -228,7 +229,7 @@ export default function PagesManagementPage() {
         });
       }
       setIsFormOpen(false);
-      setEditingPage(null);
+      setEditingPage(null); 
       fetchPages();
     } catch (err) {
       console.error("Error saving page:", err);
@@ -278,7 +279,7 @@ export default function PagesManagementPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input type="search" placeholder="Search pages..." className="pl-8 sm:w-[300px]" />
             </div>
-            {user && ( // Show create button if user is logged in
+            {user && ( 
                 <Button onClick={handleCreateNewPage}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Create New Page
                 </Button>
@@ -386,7 +387,9 @@ export default function PagesManagementPage() {
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
           setIsFormOpen(isOpen);
-          if (!isOpen) setEditingPage(null);
+          if (!isOpen) { // When dialog closes for any reason
+            setEditingPage(null); 
+          }
       }}>
         <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl">
           <DialogHeader>
@@ -395,14 +398,17 @@ export default function PagesManagementPage() {
               {editingPage ? "Make changes to your page here." : "Fill in the details for your new page."} Click save when you're done.
             </DialogDescription>
           </DialogHeader>
-          <PageForm
-            onSubmit={handleFormSubmit}
-            initialData={editingPage}
-            onCancel={() => {
-              setIsFormOpen(false);
-              setEditingPage(null);
-            }}
-          />
+          {isFormOpen && ( // Conditionally render PageForm only when dialog is open
+            <PageForm
+              key={editingPage ? `edit-${editingPage.id}` : 'create-new-page'} // More distinct key
+              onSubmit={handleFormSubmit}
+              initialData={editingPage}
+              onCancel={() => {
+                setIsFormOpen(false);
+                setEditingPage(null);
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

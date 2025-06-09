@@ -14,13 +14,14 @@ import type { Page, HomePage, AboutUsPage, AdmissionsPage, ContactPage, Programs
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/context/AuthContext'; 
 
 import { HomePageContentSchema, HeroSlideSchema, WhyChooseFeatureSchema, ProgramItemSchema, CounterItemSchema, CentreItemSchema as HomeCentreItemSchema, AccreditationLogoSchema, GlobalPartnerSchema } from '@/schemas/pages/homePageSchema';
 import { AboutUsPageContentSchema, MissionPointSchema, TimelineEventSchema } from '@/schemas/pages/aboutUsPageSchema';
 import { AdmissionsPageContentSchema, ApplicationStepSchema, FaqItemSchema } from '@/schemas/pages/admissionsPageSchema';
 import { ContactPageContentSchema } from '@/schemas/pages/contactPageSchema';
 import { ProgramsListingPageContentSchema, ProgramTabSchema, ProgramCardSchema } from '@/schemas/pages/programsListingPageSchema';
-import { IndividualProgramPageContentSchema, StringListItemSchema as IndividualProgramStringListItemSchema } from '@/schemas/pages/individualProgramPageSchema'; // FaqItemSchema re-exported
+import { IndividualProgramPageContentSchema, StringListItemSchema as IndividualProgramStringListItemSchema } from '@/schemas/pages/individualProgramPageSchema';
 import { CentresOverviewPageContentSchema, CentreCardSchema as OverviewCentreCardSchema } from '@/schemas/pages/centresOverviewPageSchema';
 import { IndividualCentrePageContentSchema, CentreFeatureSchema as IndividualCentreFeatureSchema } from '@/schemas/pages/individualCentrePageSchema';
 import { EnquiryPageContentSchema, EnquiryFormFieldSchema } from '@/schemas/pages/enquiryPageSchema';
@@ -80,6 +81,7 @@ const generateSlug = (title: string) => {
 
 export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
   const { toast } = useToast();
+  const { user, userData } = useAuth(); 
   
   const [currentContentType, setCurrentContentType] = useState<PageType>(initialData?.pageType || 'generic');
 
@@ -89,7 +91,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
       title: initialData?.title || '',
       slug: initialData?.slug || '',
       status: initialData?.status || 'Draft',
-      author: initialData?.author || 'Admin',
+      author: initialData?.author || userData?.name || user?.email || 'Admin', 
       pageType: initialData?.pageType || 'generic',
       content: initialData?.content || {},
     },
@@ -140,7 +142,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
     const newPageType = watchedPageType || 'generic';
     setCurrentContentType(newPageType);
 
-    const currentValues = getValues();
+    const currentFormValues = getValues(); // Get current form values before reset
     let newContentDefaults = {};
 
     try {
@@ -172,30 +174,30 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
           case 'enquiry':
               newContentDefaults = initialData?.pageType === 'enquiry' ? (initialData as EnquiryPage).content : EnquiryPageContentSchema.parse({});
               break;
-          default:
-              newContentDefaults = (initialData?.pageType === 'generic' && initialData.content) ? initialData.content : {};
+          default: // generic
+              newContentDefaults = (initialData?.pageType === 'generic' && initialData.content) ? initialData.content : { mainContent: '' };
               break;
       }
     } catch(e) {
-        console.error("Error parsing default content for page type:", newPageType, e);
-        toast({ title: "Form Initialization Error", description: `Could not initialize content for page type ${newPageType}.`, variant: "destructive"});
-        newContentDefaults = {}; // Fallback to empty object
+        console.error(`Error parsing default content for page type "${newPageType}":`, e);
+        toast({ title: "Form Initialization Error", description: `Could not initialize content for page type ${newPageType}. Defaulting to empty.`, variant: "destructive"});
+        newContentDefaults = (newPageType === 'generic') ? { mainContent: ''} : {};
     }
     
     reset({
-        title: currentValues.title || initialData?.title || '',
-        slug: currentValues.slug || initialData?.slug || (currentValues.title ? generateSlug(currentValues.title) : ''),
-        status: currentValues.status || initialData?.status || 'Draft',
-        author: currentValues.author || initialData?.author || 'Admin',
+        title: initialData?.title || currentFormValues.title || '',
+        slug: initialData?.slug || currentFormValues.slug || ( (initialData?.title || currentFormValues.title) ? generateSlug(initialData?.title || currentFormValues.title) : ''),
+        status: initialData?.status || currentFormValues.status || 'Draft',
+        author: initialData?.author || currentFormValues.author || userData?.name || user?.email || 'Admin',
         pageType: newPageType,
         content: newContentDefaults,
     });
 
-  }, [watchedPageType, initialData, reset, getValues, toast]);
+  }, [watchedPageType, initialData, reset, getValues, toast, user, userData]); 
 
 
   useEffect(() => {
-    if (watchedTitle && !initialData?.slug && !initialData?.title && !getValues("slug")) {
+    if (watchedTitle && !initialData?.slug && !getValues("slug") && !initialData?.title) { // Only auto-generate slug if it's a truly new page (no initialData title/slug)
       setValue("slug", generateSlug(watchedTitle), { shouldValidate: true });
     }
   }, [watchedTitle, setValue, initialData, getValues]);
@@ -289,13 +291,16 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
             case 'enquiry':
                 pageContent = EnquiryPageContentSchema.parse(contentFromForm);
                 break;
-            default: 
+            default: // generic
                 pageContent = contentFromForm; 
+                if (typeof pageContent.mainContent === 'undefined') { 
+                    pageContent.mainContent = '';
+                }
                 break;
         }
     } catch (e) {
         if (e instanceof z.ZodError) {
-            console.error("Content validation error:", e.errors);
+            console.error("Content validation error for page type", `'${data.pageType}'`, ":", JSON.stringify(e.errors, null, 2));
             toast({
                 title: "Content Validation Error",
                 description: `There are issues with the content for page type "${data.pageType}". Check console for details.`,
@@ -315,7 +320,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
     appendFn: (value: any) => void, 
     baseName: string, 
     itemSchema: Record<string, { label: string; type: 'input' | 'textarea' | 'select'; options?: string[]; placeholder?: string }>,
-    itemDefaultGenerator: () => any, // Changed to a generator function
+    itemDefaultGenerator: () => any, 
     sectionTitle: string
   ) => (
     <Card className="my-4">
@@ -347,6 +352,12 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                   ) : (
                     <Input {...register(`${baseName}.${index}.${key}` as const)} placeholder={schema.placeholder || `Enter ${schema.label.toLowerCase()}`} />
                   )}
+                  {/* Basic error display attempt for field arrays */}
+                  {errors.content && (errors.content as any)?.[baseName.split('.')[1]]?.[baseName.split('.')[2]]?.[index]?.[key] && (
+                    <p className="text-sm text-destructive mt-1">
+                        {(errors.content as any)?.[baseName.split('.')[1]]?.[baseName.split('.')[2]]?.[index]?.[key]?.message}
+                    </p>
+                   )}
                 </div>
               ))}
             </div>
@@ -667,7 +678,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                     </Card>
                      <Card className="my-4"><CardHeader><CardTitle className="text-md">Program FAQs</CardTitle></CardHeader>
                         <CardContent>
-                            {renderFieldArray( // Using FaqItemSchema from admissions, re-exported by individualProgramPageSchema
+                            {renderFieldArray( 
                                 programFaqsFields, removeProgramFaq, () => appendProgramFaq(FaqItemSchema.parse({})), "content.programFaqs.faqs", 
                                 { question: { label: "Question", type: 'input' }, answer: { label: "Answer", type: 'textarea'}}, 
                                 () => FaqItemSchema.parse({}), 
@@ -787,7 +798,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
         )}
 
 
-        <div className="flex justify-end gap-2 pt-4 sticky bottom-0 bg-background pb-4 border-t">
+        <div className="flex justify-end gap-2 pt-4 sticky bottom-0 bg-background pb-4 border-t z-10">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting || isCheckingSlug}>
             Cancel
           </Button>
