@@ -1,3 +1,4 @@
+
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
@@ -28,16 +29,16 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/content-files', label: 'Content Files', icon: Boxes },
   { href: '/content-blocks', label: 'Content Blocks', icon: Grid },
   { href: '/media-manager', label: 'Media Manager', icon: ImageIcon },
-  {
-    groupLabel: 'Development',
-    href: '#', // Placeholder, not a direct link
-    label: 'Development Tools', // Not displayed directly, for grouping logic
-    icon: Database, // Generic icon for group
-    subItems: [
-      { href: '/schema-builder', label: 'Schema Builder', icon: Database },
-      { href: '/form-builder', label: 'Form Builder', icon: ClipboardList },
-    ],
-  },
+  // {
+  //   groupLabel: 'Development',
+  //   href: '#', // Placeholder, not a direct link
+  //   label: 'Development Tools', // Not displayed directly, for grouping logic
+  //   icon: Database, // Generic icon for group
+  //   subItems: [
+  //     { href: '/schema-builder', label: 'Schema Builder', icon: Database },
+  //     { href: '/form-builder', label: 'Form Builder', icon: ClipboardList },
+  //   ],
+  // },
   {
     groupLabel: 'Administration',
     href: '#',
