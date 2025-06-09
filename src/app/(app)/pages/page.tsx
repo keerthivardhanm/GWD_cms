@@ -214,7 +214,7 @@ export default function PagesManagementPage() {
         ...values, 
         content: contentData || {}, 
         updatedAt: serverTimestamp(),
-        author: userData?.name || user?.email || 'System', // Ensure author is set
+        author: userData?.name || user?.email || 'System', 
       };
 
       if (editingPage) {
@@ -285,7 +285,7 @@ export default function PagesManagementPage() {
         title="Page Management"
         description="Create, edit, and manage your website pages."
         actions={
-          <>
+          <div className="flex items-center gap-2"> {/* Ensure actions are wrapped if multiple */}
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input type="search" placeholder="Search pages..." className="pl-8 sm:w-[300px]" />
@@ -295,7 +295,7 @@ export default function PagesManagementPage() {
                 <PlusCircle className="mr-2 h-4 w-4" /> Create New Page
               </Button>
             )}
-          </>
+          </div>
         }
       />
 

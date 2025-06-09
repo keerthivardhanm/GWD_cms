@@ -12,12 +12,12 @@ interface QuickActionItemProps {
 
 const QuickActionItem: React.FC<QuickActionItemProps> = ({ href, icon: IconComponent, label, isExternal }) => {
   return (
-    <Link href={href} target={isExternal ? "_blank" : "_self"} rel={isExternal ? "noopener noreferrer" : undefined} asChild>
-      <Button variant="outline" size="sm" className="h-auto px-3 py-2 flex flex-col items-center justify-center text-center w-[100px] shrink-0">
+    <Button variant="outline" size="sm" className="h-auto px-3 py-2 flex flex-col items-center justify-center text-center w-[100px] shrink-0" asChild>
+      <Link href={href} target={isExternal ? "_blank" : "_self"} rel={isExternal ? "noopener noreferrer" : undefined}>
         <IconComponent className="h-5 w-5 mb-1 text-primary" />
         <span className="text-xs font-medium leading-tight block whitespace-nowrap overflow-hidden text-ellipsis w-full">{label}</span>
-      </Button>
-    </Link>
+      </Link>
+    </Button>
   );
 };
 
