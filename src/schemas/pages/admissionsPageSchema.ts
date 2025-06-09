@@ -1,16 +1,18 @@
 
 import { z } from 'zod';
 
-const ApplicationStepSchema = z.object({
+export const ApplicationStepSchema = z.object({
   number: z.string().optional().default(''),
   title: z.string().optional().default(''),
   description: z.string().optional().default(''),
 }).default({});
+export type ApplicationStepType = z.infer<typeof ApplicationStepSchema>;
 
-const FaqItemSchema = z.object({
+export const FaqItemSchema = z.object({ // Generic, can be reused
   question: z.string().optional().default(''),
   answer: z.string().optional().default(''),
 }).default({});
+export type FaqItemType = z.infer<typeof FaqItemSchema>;
 
 export const AdmissionsPageContentSchema = z.object({
   applicationSteps: z.object({

@@ -1,10 +1,16 @@
 
 import { z } from 'zod';
 
-const TimelineEventSchema = z.object({
+export const MissionPointSchema = z.object({
+  point: z.string().optional().default(''),
+}).default({});
+export type MissionPointType = z.infer<typeof MissionPointSchema>;
+
+export const TimelineEventSchema = z.object({
   year: z.string().optional().default(''),
   event: z.string().optional().default(''),
 }).default({});
+export type TimelineEventType = z.infer<typeof TimelineEventSchema>;
 
 export const AboutUsPageContentSchema = z.object({
   banner: z.object({
@@ -14,7 +20,7 @@ export const AboutUsPageContentSchema = z.object({
   }).optional().default({}),
   visionMission: z.object({
     visionText: z.string().optional().default(''),
-    missionPoints: z.array(z.string().optional().default('')).optional().default([]),
+    missionPoints: z.array(MissionPointSchema).optional().default([]),
   }).optional().default({ missionPoints: [] }),
   timelineSection: z.object({
     events: z.array(TimelineEventSchema).optional().default([]),
