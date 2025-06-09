@@ -1,7 +1,6 @@
 
 import { z } from 'zod';
-import type { FaqItemType } from './admissionsPageSchema'; // Re-use FaqItemSchema
-export { FaqItemSchema } from './admissionsPageSchema'; // Re-export for convenience
+import { FaqItemSchema } from './admissionsPageSchema'; // Direct import for use as a value
 
 export const StringListItemSchema = z.object({
   value: z.string().optional().default('')
@@ -36,7 +35,7 @@ export const IndividualProgramPageContentSchema = z.object({
     careers: z.array(StringListItemSchema).optional().default([]),
   }).optional().default({ careers: [] }),
   programFaqs: z.object({
-    faqs: z.array(FaqItemSchema).optional().default([]),
+    faqs: z.array(FaqItemSchema).optional().default([]), // Now FaqItemSchema is correctly in scope
   }).optional().default({ faqs: [] }),
 }).default({});
 
