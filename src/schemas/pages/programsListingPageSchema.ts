@@ -1,12 +1,13 @@
 
 import { z } from 'zod';
 
-const ProgramTabSchema = z.object({
+export const ProgramTabSchema = z.object({
     title: z.string().optional().default(''),
     anchorLink: z.string().optional().default('').describe("e.g., #category-slug"),
 }).default({});
+export type ProgramTabType = z.infer<typeof ProgramTabSchema>;
 
-const ProgramCardSchema = z.object({
+export const ProgramCardSchema = z.object({
     title: z.string().optional().default(''),
     imgSrc: z.string().url({ message: "Invalid URL format for image source." }).or(z.literal('')).optional().default(''),
     alt: z.string().optional().default(''),
@@ -14,6 +15,7 @@ const ProgramCardSchema = z.object({
     duration: z.string().optional().default(''),
     btnLink: z.string().optional().default('').describe("Relative or absolute URL to the program detail page"),
 }).default({});
+export type ProgramCardType = z.infer<typeof ProgramCardSchema>;
 
 export const ProgramsListingPageContentSchema = z.object({
     programTabs: z.object({
@@ -25,3 +27,4 @@ export const ProgramsListingPageContentSchema = z.object({
 }).default({});
 
 export type ProgramsListingPageContentType = z.infer<typeof ProgramsListingPageContentSchema>;
+

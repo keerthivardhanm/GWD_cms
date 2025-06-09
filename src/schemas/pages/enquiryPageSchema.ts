@@ -1,7 +1,7 @@
 
 import { z } from 'zod';
 
-const EnquiryFormFieldSchema = z.object({
+export const EnquiryFormFieldSchema = z.object({
     label: z.string().optional(),
     name: z.string().optional().describe("Unique key for the field, e.g., 'fullName'"),
     inputType: z.enum(['text', 'email', 'tel', 'textarea', 'select', 'checkbox', 'radio']).optional().default('text'),
@@ -9,6 +9,8 @@ const EnquiryFormFieldSchema = z.object({
     options: z.array(z.string()).optional().describe("For select, radio, or checkbox groups"), // For select, radio, checkbox groups
     required: z.boolean().optional().default(false),
 }).default({});
+export type EnquiryFormFieldType = z.infer<typeof EnquiryFormFieldSchema>;
+
 
 export const EnquiryPageContentSchema = z.object({
     enquiryForm: z.object({
