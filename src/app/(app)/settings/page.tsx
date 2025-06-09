@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, watch } from 'react-hook-form'; // Added watch
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ImageIcon, Globe, Shield, Mail, DatabaseBackup, Link as LinkIcon, Palette, Code, Save, RotateCcw, AlertTriangle, Loader2 } from "lucide-react";
+import { ImageIcon, Globe, Shield, Mail, DatabaseBackup, Link as LinkIcon, Palette, Code, Save, RotateCcw, AlertTriangle, Loader2, Users } from "lucide-react"; // Added Users
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
@@ -78,7 +78,7 @@ const settingsSchema = z.object({
 type SettingsFormValues = z.infer<typeof settingsSchema>;
 
 const SETTINGS_DOC_ID = "globalAppSettings";
-const SETTINGS_COLLECTION = "config";
+const SETTINGS_COLLECTION = "config"; // Changed from "settings" to "config" to avoid conflict if "settings" is used for user-specific settings
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -86,10 +86,15 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const { control, register, handleSubmit, reset, formState: { errors } } = useForm<SettingsFormValues>({
+  const { control, register, handleSubmit, reset, formState: { errors }, watch: watchForm } = useForm<SettingsFormValues>({ // Renamed watch to watchForm
     resolver: zodResolver(settingsSchema),
     defaultValues: settingsSchema.parse({}), // Initialize with Zod defaults
   });
+
+  // Use watchForm to get current values for preview if needed
+  const siteLogoUrlPreview = watchForm("siteLogoUrl");
+  const faviconUrlPreview = watchForm("faviconUrl");
+
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -99,14 +104,19 @@ export default function SettingsPage() {
         const docSnap = await getDoc(settingsDocRef);
         if (docSnap.exists()) {
           const fetchedData = docSnap.data();
-          reset(settingsSchema.parse(fetchedData)); // Validate and parse fetched data
+          // Validate and parse fetched data, providing defaults for any missing fields
+          const parsedData = settingsSchema.parse(fetchedData);
+          reset(parsedData);
         } else {
-          // If no settings exist, form uses Zod defaults
+          // If no settings exist, form uses Zod defaults defined in settingsSchema
+          reset(settingsSchema.parse({}));
           console.log("No settings document found, using default values.");
         }
       } catch (error) {
         console.error("Error fetching settings:", error);
         toast({ title: "Error", description: "Failed to load settings.", variant: "destructive" });
+        // Fallback to Zod defaults in case of error
+        reset(settingsSchema.parse({}));
       } finally {
         setIsLoading(false);
       }
@@ -118,8 +128,10 @@ export default function SettingsPage() {
     setIsSaving(true);
     try {
       const settingsDocRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOC_ID);
-      await setDoc(settingsDocRef, { ...data, lastUpdatedBy: user?.uid, updatedAt: serverTimestamp() }, { merge: true });
-      await logAuditEvent(user, userData, 'SETTINGS_UPDATED', 'GlobalSettings', SETTINGS_DOC_ID, 'Global App Settings', { updatedSettings: Object.keys(data) });
+      // Ensure all fields from schema are present, even if undefined (Zod defaults will apply if not in 'data')
+      const dataToSave = settingsSchema.parse(data); 
+      await setDoc(settingsDocRef, { ...dataToSave, lastUpdatedBy: user?.uid, updatedAt: serverTimestamp() }, { merge: true });
+      await logAuditEvent(user, userData, 'SETTINGS_UPDATED', 'GlobalSettings', SETTINGS_DOC_ID, 'Global App Settings', { updatedSettings: Object.keys(dataToSave) });
       toast({ title: "Success", description: "Settings saved successfully." });
     } catch (error) {
       console.error("Error saving settings:", error);
@@ -171,8 +183,8 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div><Label htmlFor="siteTitle">Site Title</Label><Input id="siteTitle" {...register("siteTitle")} />{errors.siteTitle && <p className="text-sm text-destructive">{errors.siteTitle.message}</p>}</div>
                 <div><Label htmlFor="siteTagline">Site Tagline</Label><Input id="siteTagline" {...register("siteTagline")} />{errors.siteTagline && <p className="text-sm text-destructive">{errors.siteTagline.message}</p>}</div>
-                <div><Label htmlFor="siteLogoUpload">Site Logo</Label><Input id="siteLogoUpload" type="file" /><p className="text-xs text-muted-foreground">Current: {watch("siteLogoUrl") || "Not set"}. Upload functionality to be implemented.</p></div>
-                <div><Label htmlFor="faviconUpload">Favicon</Label><Input id="faviconUpload" type="file" /><p className="text-xs text-muted-foreground">Current: {watch("faviconUrl") || "Not set"}. Upload functionality to be implemented.</p></div>
+                <div><Label htmlFor="siteLogoUpload">Site Logo</Label><Input id="siteLogoUpload" type="file" /><p className="text-xs text-muted-foreground">Current: {siteLogoUrlPreview || "Not set"}. Upload functionality to be implemented.</p></div>
+                <div><Label htmlFor="faviconUpload">Favicon</Label><Input id="faviconUpload" type="file" /><p className="text-xs text-muted-foreground">Current: {faviconUrlPreview || "Not set"}. Upload functionality to be implemented.</p></div>
                 <div>
                   <Label htmlFor="defaultLanguage">Default Language</Label>
                   <Controller name="defaultLanguage" control={control} render={({ field }) => (
