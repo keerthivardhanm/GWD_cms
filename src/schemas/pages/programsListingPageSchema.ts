@@ -2,17 +2,17 @@
 import { z } from 'zod';
 
 const ProgramTabSchema = z.object({
-    title: z.string().optional(),
-    anchorLink: z.string().optional().describe("e.g., #category-slug"),
+    title: z.string().optional().default(''),
+    anchorLink: z.string().optional().default('').describe("e.g., #category-slug"),
 }).default({});
 
 const ProgramCardSchema = z.object({
-    title: z.string().optional(),
-    imgSrc: z.string().url().optional(),
-    alt: z.string().optional(),
-    description: z.string().optional(),
-    duration: z.string().optional(),
-    btnLink: z.string().optional().describe("Relative or absolute URL to the program detail page"),
+    title: z.string().optional().default(''),
+    imgSrc: z.string().url({ message: "Invalid URL format for image source." }).or(z.literal('')).optional().default(''),
+    alt: z.string().optional().default(''),
+    description: z.string().optional().default(''),
+    duration: z.string().optional().default(''),
+    btnLink: z.string().optional().default('').describe("Relative or absolute URL to the program detail page"),
 }).default({});
 
 export const ProgramsListingPageContentSchema = z.object({
@@ -25,5 +25,3 @@ export const ProgramsListingPageContentSchema = z.object({
 }).default({});
 
 export type ProgramsListingPageContentType = z.infer<typeof ProgramsListingPageContentSchema>;
-
-    

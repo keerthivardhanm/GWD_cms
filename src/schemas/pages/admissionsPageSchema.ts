@@ -2,34 +2,32 @@
 import { z } from 'zod';
 
 const ApplicationStepSchema = z.object({
-  number: z.string().optional(),
-  title: z.string().optional(),
-  description: z.string().optional(),
+  number: z.string().optional().default(''),
+  title: z.string().optional().default(''),
+  description: z.string().optional().default(''),
 }).default({});
 
 const FaqItemSchema = z.object({
-  question: z.string().optional(),
-  answer: z.string().optional(),
+  question: z.string().optional().default(''),
+  answer: z.string().optional().default(''),
 }).default({});
 
 export const AdmissionsPageContentSchema = z.object({
   applicationSteps: z.object({
-    mainHeading: z.string().optional(),
+    mainHeading: z.string().optional().default(''),
     steps: z.array(ApplicationStepSchema).optional().default([]),
   }).optional().default({ steps: [] }),
   admissionsFaq: z.object({
-    sectionHeading: z.string().optional(),
+    sectionHeading: z.string().optional().default(''),
     faqs: z.array(FaqItemSchema).optional().default([]),
   }).optional().default({ faqs: [] }),
   eligibilitySection: z.object({
-    eligibilityCriteria: z.string().optional(),
-    durationInfo: z.string().optional(),
-    feeStructure: z.string().optional(),
-    buttonText: z.string().optional(),
-    buttonLink: z.string().url().optional(),
+    eligibilityCriteria: z.string().optional().default(''),
+    durationInfo: z.string().optional().default(''),
+    feeStructure: z.string().optional().default(''),
+    buttonText: z.string().optional().default(''),
+    buttonLink: z.string().url({ message: "Invalid URL format for button link." }).or(z.literal('')).optional().default(''),
   }).optional().default({}),
 }).default({});
 
 export type AdmissionsPageContentType = z.infer<typeof AdmissionsPageContentSchema>;
-
-    
