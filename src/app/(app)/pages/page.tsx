@@ -16,13 +16,15 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, QueryDocumentSnapshot, DocumentData, Timestamp, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { PageForm, PageFormValues, PageStatus, PageType } from '@/components/forms/PageForm';
-import { HomePageContentType } from '@/schemas/pages/homePageSchema';
-import { AboutUsPageContentType } from '@/schemas/pages/aboutUsPageSchema';
-import { AdmissionsPageContentType } from '@/schemas/pages/admissionsPageSchema';
-import { ContactPageContentType } from '@/schemas/pages/contactPageSchema';
-import { ProgramsListingPageContentType } from '@/schemas/pages/programsListingPageSchema';
-import { IndividualProgramPageContentType } from '@/schemas/pages/individualProgramPageSchema';
-// Import other page content type schemas as you create them
+import type { HomePageContentType } from '@/schemas/pages/homePageSchema';
+import type { AboutUsPageContentType } from '@/schemas/pages/aboutUsPageSchema';
+import type { AdmissionsPageContentType } from '@/schemas/pages/admissionsPageSchema';
+import type { ContactPageContentType } from '@/schemas/pages/contactPageSchema';
+import type { ProgramsListingPageContentType } from '@/schemas/pages/programsListingPageSchema';
+import type { IndividualProgramPageContentType } from '@/schemas/pages/individualProgramPageSchema';
+import type { CentresOverviewPageContentType } from '@/schemas/pages/centresOverviewPageSchema';
+import type { IndividualCentrePageContentType } from '@/schemas/pages/individualCentrePageSchema';
+import type { EnquiryPageContentType } from '@/schemas/pages/enquiryPageSchema';
 
 import { useAuth } from '@/context/AuthContext';
 
@@ -41,7 +43,7 @@ interface BasePage {
 
 // Define specific page types with their content
 export interface GenericPageData {
-  mainContent?: string; // Example for generic markdown/html content
+  mainContent?: string; 
   [key: string]: any; 
 }
 export interface GenericPage extends BasePage {
@@ -70,19 +72,26 @@ export interface ContactPage extends BasePage {
 }
 
 export interface ProgramsListingPage extends BasePage {
-  pageType: 'programs'; // Maps to "Programs Listing"
+  pageType: 'programs'; 
   content: ProgramsListingPageContentType;
 }
 
 export interface IndividualProgramPage extends BasePage {
-  pageType: 'program-detail'; // Maps to "Individual Program"
+  pageType: 'program-detail'; 
   content: IndividualProgramPageContentType;
 }
-
-// Add interfaces for other page types:
-// export interface CentresOverviewPage extends BasePage { pageType: 'centres'; content: CentresOverviewContentType; }
-// export interface IndividualCentrePage extends BasePage { pageType: 'centre-detail'; content: IndividualCentreContentType; }
-// export interface EnquiryPage extends BasePage { pageType: 'enquiry'; content: EnquiryPageContentType; }
+export interface CentresOverviewPage extends BasePage { 
+  pageType: 'centres'; 
+  content: CentresOverviewPageContentType; 
+}
+export interface IndividualCentrePage extends BasePage { 
+  pageType: 'centre-detail'; 
+  content: IndividualCentrePageContentType; 
+}
+export interface EnquiryPage extends BasePage { 
+  pageType: 'enquiry'; 
+  content: EnquiryPageContentType; 
+}
 
 
 // Union type for all possible page structures
@@ -93,8 +102,11 @@ export type Page =
   | AdmissionsPage
   | ContactPage
   | ProgramsListingPage
-  | IndividualProgramPage;
-  // Add other specific page types to the union
+  | IndividualProgramPage
+  | CentresOverviewPage
+  | IndividualCentrePage
+  | EnquiryPage;
+
 
 export default function PagesManagementPage() {
   const [pages, setPages] = useState<Page[]>([]);
@@ -112,7 +124,7 @@ export default function PagesManagementPage() {
     setLoading(true);
     setError(null);
     try {
-      const pagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc")); // Order by updatedAt for most recent first
+      const pagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc")); 
       const querySnapshot = await getDocs(pagesQuery);
       const pagesData = querySnapshot.docs.map((docSnap: QueryDocumentSnapshot<DocumentData>) => {
         const data = docSnap.data();
@@ -130,10 +142,9 @@ export default function PagesManagementPage() {
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
           pageType: data.pageType || 'generic',
-          content: data.content || {}, // Ensure content is at least an empty object
+          content: data.content || {}, 
         };
         
-        // Return the specific page type based on pageType field
         switch (baseData.pageType) {
           case 'home':
             return { ...baseData, content: data.content || {} } as HomePage;
@@ -147,7 +158,12 @@ export default function PagesManagementPage() {
             return { ...baseData, content: data.content || {} } as ProgramsListingPage;
           case 'program-detail':
             return { ...baseData, content: data.content || {} } as IndividualProgramPage;
-          // Add cases for other page types
+          case 'centres':
+            return { ...baseData, content: data.content || {} } as CentresOverviewPage;
+          case 'centre-detail':
+            return { ...baseData, content: data.content || {} } as IndividualCentrePage;
+          case 'enquiry':
+            return { ...baseData, content: data.content || {} } as EnquiryPage;
           default:
             return { ...baseData, content: data.content || {} } as GenericPage;
         }
@@ -195,18 +211,17 @@ export default function PagesManagementPage() {
     }
     try {
       const dataToSave: any = {
-        ...values, // title, slug, status, author, pageType from PageFormValues
-        content: contentData || {}, // Parsed content from PageForm
+        ...values, 
+        content: contentData || {}, 
         updatedAt: serverTimestamp(),
+        author: userData?.name || user?.email || 'System', // Ensure author is set
       };
 
       if (editingPage) {
         const pageRef = doc(db, "pages", editingPage.id);
-        // Ensure createdAt is not overwritten if it exists
         if (editingPage.createdAt) {
           dataToSave.createdAt = editingPage.createdAt; 
         } else {
-          // This case should ideally not happen if pages are always created with createdAt
           dataToSave.createdAt = serverTimestamp(); 
         }
         await updateDoc(pageRef, dataToSave);
@@ -256,6 +271,13 @@ export default function PagesManagementPage() {
       });
     }
   };
+  
+  const NoPagesMessage = () => {
+    if (isAdmin) {
+      return "No pages found. Click \"Create New Page\" to get started.";
+    }
+    return "No pages found. Contact an administrator to add pages.";
+  };
 
   return (
     <div className="space-y-6">
@@ -287,7 +309,9 @@ export default function PagesManagementPage() {
           )}
           {error && <p className="p-4 text-center text-destructive">{error}</p>}
           {!loading && !error && pages.length === 0 && (
-            <p className="p-4 text-center text-muted-foreground">No pages found. Click "Create New Page" to get started.</p>
+            <p className="p-4 text-center text-muted-foreground">
+              <NoPagesMessage />
+            </p>
           )}
           {!loading && !error && pages.length > 0 && (
             <Table>
@@ -318,7 +342,7 @@ export default function PagesManagementPage() {
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">{page.lastModified}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" className="mr-2" onClick={() => alert('Preview not implemented yet. Page slug: ' + page.slug)}>
+                      <Button variant="ghost" size="sm" className="mr-2" onClick={() => alert('Preview not implemented yet. Intended public URL: /' + (page.pageType === 'home' ? '' : page.slug))}>
                         <Eye className="h-4 w-4 mr-1" /> Preview
                       </Button>
                       {isAdmin && (
@@ -376,7 +400,7 @@ export default function PagesManagementPage() {
           setIsFormOpen(isOpen);
           if (!isOpen) setEditingPage(null);
       }}>
-        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl">
           <DialogHeader>
             <DialogTitle>{editingPage ? "Edit Page" : "Create New Page"}</DialogTitle>
             <DialogDescription>
@@ -396,5 +420,3 @@ export default function PagesManagementPage() {
     </div>
   );
 }
-
-    
