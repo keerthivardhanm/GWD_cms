@@ -15,16 +15,18 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { db } from '@/lib/firebase';
-import { collection, getDocs, QueryDocumentSnapshot, DocumentData, Timestamp, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, QueryDocumentSnapshot, DocumentData, Timestamp, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, getDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { UserForm, UserFormValues, UserRole } from '@/components/forms/UserForm';
-import { RoleForm, RoleFormValues } from '@/components/forms/RoleForm'; // New form for roles
+import { RoleForm, RoleFormValues } from '@/components/forms/RoleForm'; 
+import { useAuth } from '@/context/AuthContext';
+import { logAuditEvent } from '@/lib/auditLogger';
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: UserRole | string; // Allow string to accommodate custom role names
   lastLogin?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
@@ -57,6 +59,7 @@ export default function AccessControlPage() {
   const [errorUsers, setErrorUsers] = useState<string | null>(null);
   const [errorRoles, setErrorRoles] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user: authUser, userData: authUserData } = useAuth(); // Renamed to avoid conflict
 
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -129,8 +132,8 @@ export default function AccessControlPage() {
     setIsUserFormOpen(true);
   };
 
-  const handleEditUser = (user: User) => {
-    setEditingUser(user);
+  const handleEditUser = (userToEdit: User) => {
+    setEditingUser(userToEdit);
     setIsUserFormOpen(true);
   };
 
@@ -142,16 +145,18 @@ export default function AccessControlPage() {
           ...values,
           updatedAt: serverTimestamp(),
         });
+        await logAuditEvent(authUser, authUserData, 'USER_UPDATED', 'User', editingUser.id, values.name, { newValues: values });
         toast({ title: "Success", description: "User updated successfully." });
       } else {
-        await addDoc(collection(db, "users"), {
+        const newDocRef = await addDoc(collection(db, "users"), {
           ...values,
-          // For new users, their actual UID from Firebase Auth should be used as doc ID
-          // This example assumes we are creating a profile manually for now
-          // A proper user creation flow would involve Firebase Auth
+          // For new users, Firestore typically uses UID as doc ID if integrated with Auth user creation.
+          // Here, we are manually creating profiles, so Firestore auto-generates an ID.
+          // A real app would likely set the document ID to the Firebase Auth user.uid.
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
+        await logAuditEvent(authUser, authUserData, 'USER_CREATED', 'User', newDocRef.id, values.name, { values });
         toast({ title: "Success", description: "User invited successfully." });
       }
       setIsUserFormOpen(false);
@@ -166,6 +171,7 @@ export default function AccessControlPage() {
   const handleDeleteUser = async (userId: string, userName: string) => {
     try {
       await deleteDoc(doc(db, "users", userId));
+      await logAuditEvent(authUser, authUserData, 'USER_DELETED', 'User', userId, userName);
       toast({ title: "Success", description: `User "${userName}" removed successfully.` });
       fetchUsers();
     } catch (err) {
@@ -192,13 +198,15 @@ export default function AccessControlPage() {
           ...values,
           updatedAt: serverTimestamp(),
         });
+        await logAuditEvent(authUser, authUserData, 'ROLE_UPDATED', 'Role', editingRole.id, values.name, { newValues: values });
         toast({ title: "Success", description: "Role updated successfully." });
       } else {
-        await addDoc(collection(db, "roles"), {
+        const newDocRef = await addDoc(collection(db, "roles"), {
           ...values,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
+        await logAuditEvent(authUser, authUserData, 'ROLE_CREATED', 'Role', newDocRef.id, values.name, { values });
         toast({ title: "Success", description: "Role created successfully." });
       }
       setIsRoleFormOpen(false);
@@ -211,9 +219,7 @@ export default function AccessControlPage() {
   };
 
   const handleDeleteRole = async (roleId: string, roleName: string) => {
-    // Basic check: prevent deleting a role if users are assigned to it.
-    // More robust checks might be needed (e.g., cannot delete default 'Admin' role).
-    const usersWithRole = users.filter(user => user.role === roleName); // This assumes role name is unique identifier.
+    const usersWithRole = users.filter(user => user.role === roleName);
     if (usersWithRole.length > 0) {
         toast({ title: "Cannot Delete Role", description: `Role "${roleName}" is currently assigned to ${usersWithRole.length} user(s). Reassign users before deleting.`, variant: "destructive"});
         return;
@@ -225,6 +231,7 @@ export default function AccessControlPage() {
 
     try {
       await deleteDoc(doc(db, "roles", roleId));
+      await logAuditEvent(authUser, authUserData, 'ROLE_DELETED', 'Role', roleId, roleName);
       toast({ title: "Success", description: `Role "${roleName}" removed successfully.` });
       fetchRoles();
     } catch (err) {
@@ -363,7 +370,7 @@ export default function AccessControlPage() {
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                         <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                         disabled={role.name === 'Admin' || role.name === 'Editor' || role.name === 'Viewer'} // Prevent deleting default roles
+                                         disabled={role.name === 'Admin' || role.name === 'Editor' || role.name === 'Viewer' || users.some(u => u.role === role.name)}
                                         >
                                             <Trash2 className="mr-2 h-4 w-4" /> Delete Role
                                         </DropdownMenuItem>
@@ -373,7 +380,7 @@ export default function AccessControlPage() {
                                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                             <AlertDialogDescription>
                                             This action cannot be undone. This will permanently remove the role "{role.name}".
-                                            Ensure no users are assigned this role before deleting.
+                                            Ensure no users are assigned this role before deleting. Default roles cannot be deleted.
                                             </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
@@ -425,6 +432,7 @@ export default function AccessControlPage() {
           <UserForm
             onSubmit={handleUserFormSubmit}
             initialData={editingUser}
+            allRoles={roles.map(r => r.name as UserRole)} // Pass available roles
             onCancel={() => {
               setIsUserFormOpen(false);
               setEditingUser(null);

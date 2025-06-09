@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, QueryDocumentSnapshot, DocumentData, Timestamp, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, QueryDocumentSnapshot, DocumentData, Timestamp, serverTimestamp, query, orderBy, getDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { PageForm, PageFormValues, PageStatus, PageType } from '@/components/forms/PageForm';
 import type { HomePageContentType } from '@/schemas/pages/homePageSchema';
@@ -27,6 +27,7 @@ import type { IndividualCentrePageContentType } from '@/schemas/pages/individual
 import type { EnquiryPageContentType } from '@/schemas/pages/enquiryPageSchema';
 
 import { useAuth } from '@/context/AuthContext';
+import { logAuditEvent } from '@/lib/auditLogger';
 
 // Define base page structure
 interface BasePage {
@@ -192,7 +193,7 @@ export default function PagesManagementPage() {
   };
 
   const handleEditPage = (page: Page) => {
-     if (!isAdmin) { // Keep edit restricted to admin
+     if (!isAdmin) { 
       toast({ title: "Permission Denied", description: "You do not have permission to edit pages.", variant: "destructive" });
       return;
     }
@@ -206,29 +207,30 @@ export default function PagesManagementPage() {
         ...values,
         content: contentData || {},
         updatedAt: serverTimestamp(),
-        author: userData?.name || user?.email || 'System',
+        author: userData?.name || user?.email || 'System', // Use current user as author
       };
 
       if (editingPage) {
-        if (!isAdmin) { // Keep edit restricted to admin
+        if (!isAdmin) {
           toast({ title: "Permission Denied", description: "You do not have permission to update pages.", variant: "destructive" });
           return;
         }
         const pageRef = doc(db, "pages", editingPage.id);
         if (editingPage.createdAt) {
-          dataToSave.createdAt = editingPage.createdAt;
+          dataToSave.createdAt = editingPage.createdAt; 
         } else {
-          dataToSave.createdAt = serverTimestamp();
+           dataToSave.createdAt = serverTimestamp(); // Should ideally not happen for an edit
         }
         await updateDoc(pageRef, dataToSave);
+        await logAuditEvent(user, userData, 'PAGE_UPDATED', 'Page', editingPage.id, values.title, { newValues: values, newContent: contentData });
         toast({
           title: "Success",
           description: "Page updated successfully.",
         });
       } else {
-        // Any authenticated user can create a page
         dataToSave.createdAt = serverTimestamp();
-        await addDoc(collection(db, "pages"), dataToSave);
+        const newDocRef = await addDoc(collection(db, "pages"), dataToSave);
+        await logAuditEvent(user, userData, 'PAGE_CREATED', 'Page', newDocRef.id, values.title, { values, content: contentData });
         toast({
           title: "Success",
           description: "Page created successfully.",
@@ -248,12 +250,18 @@ export default function PagesManagementPage() {
   };
 
   const handleDeletePage = async (pageId: string) => {
-    if (!isAdmin) { // Keep delete restricted to admin
+    if (!isAdmin) { 
       toast({ title: "Permission Denied", description: "You do not have permission to delete pages.", variant: "destructive" });
       return;
     }
     try {
+      // Fetch page title for audit log before deleting
+      const pageRef = doc(db, "pages", pageId);
+      const pageSnap = await getDoc(pageRef);
+      const pageTitle = pageSnap.exists() ? pageSnap.data().title : pageId;
+
       await deleteDoc(doc(db, "pages", pageId));
+      await logAuditEvent(user, userData, 'PAGE_DELETED', 'Page', pageId, pageTitle);
       toast({
         title: "Success",
         description: "Page deleted successfully.",
@@ -279,7 +287,7 @@ export default function PagesManagementPage() {
         title="Page Management"
         description="Create, edit, and manage your website pages."
         actions={
-          <div className="flex items-center gap-2"> {/* Ensure actions are wrapped if multiple */}
+          <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input type="search" placeholder="Search pages..." className="pl-8 sm:w-[300px]" />
@@ -338,7 +346,7 @@ export default function PagesManagementPage() {
                       <Button variant="ghost" size="sm" className="mr-2" onClick={() => alert('Preview not implemented yet. Intended public URL: /' + (page.pageType === 'home' ? '' : page.slug))}>
                         <Eye className="h-4 w-4 mr-1" /> Preview
                       </Button>
-                      {isAdmin && ( // Edit and Delete actions remain admin-only
+                      {isAdmin && ( 
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">

@@ -11,13 +11,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { User } from '@/app/(app)/access-control/page'; // Import User type
 
-export const userRoles = ["Admin", "Editor", "Viewer"] as const;
-export type UserRole = typeof userRoles[number];
+// UserRole will now be dynamic based on roles fetched from DB, but we keep a base type for schema
+export type UserRole = string; 
 
 const userFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
   email: z.string().email("Invalid email address").min(1, "Email is required"),
-  role: z.enum(userRoles),
+  role: z.string().min(1, "Role is required"), // Roles are now strings
 });
 
 export type UserFormValues = z.infer<typeof userFormSchema>;
@@ -25,16 +25,17 @@ export type UserFormValues = z.infer<typeof userFormSchema>;
 interface UserFormProps {
   onSubmit: (values: UserFormValues) => Promise<void>;
   initialData?: User | null;
+  allRoles: UserRole[]; // Pass all available role names
   onCancel: () => void;
 }
 
-export function UserForm({ onSubmit, initialData, onCancel }: UserFormProps) {
+export function UserForm({ onSubmit, initialData, allRoles, onCancel }: UserFormProps) {
   const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
     defaultValues: {
       name: initialData?.name || '',
       email: initialData?.email || '',
-      role: initialData?.role || 'Viewer',
+      role: initialData?.role || (allRoles.includes('Viewer') ? 'Viewer' : allRoles[0] || ''), // Default to Viewer or first available role
     },
   });
 
@@ -63,9 +64,13 @@ export function UserForm({ onSubmit, initialData, onCancel }: UserFormProps) {
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
-                {userRoles.map(role => (
-                  <SelectItem key={role} value={role}>{role}</SelectItem>
-                ))}
+                {allRoles.length > 0 ? (
+                  allRoles.map(role => (
+                    <SelectItem key={role} value={role}>{role}</SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="" disabled>No roles available</SelectItem>
+                )}
               </SelectContent>
             </Select>
           )}
@@ -84,5 +89,3 @@ export function UserForm({ onSubmit, initialData, onCancel }: UserFormProps) {
     </form>
   );
 }
-
-    

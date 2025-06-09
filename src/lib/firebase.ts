@@ -1,3 +1,4 @@
+
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
@@ -7,12 +8,13 @@ import { getStorage } from "firebase/storage";
 // Your web app's Firebase configuration
 // IMPORTANT: For production, you should store these keys in environment variables.
 const firebaseConfig = {
-  apiKey: "AIzaSyDWfKkIE0r7l0jW4c-GzjV0MLzJZmOXQ7k",
-  authDomain: "ahs-cms-2.firebaseapp.com",
-  projectId: "ahs-cms-2",
-  storageBucket: "ahs-cms-2.firebasestorage.app",
-  messagingSenderId: "173405605530",
-  appId: "1:173405605530:web:07d81427309814328dd923"
+  apiKey: "AIzaSyDYbsVI-4Zb0QTonR2iN-4GcLCBSrvisl8",
+  authDomain: "ahs-cms-7f4f6.firebaseapp.com",
+  projectId: "ahs-cms-7f4f6",
+  storageBucket: "ahs-cms-7f4f6.firebasestorage.app",
+  messagingSenderId: "132715335065",
+  appId: "1:132715335065:web:77e7bf22320dc0d8675708",
+  measurementId: "G-Z3E9BM7DCN"
 };
 
 // Initialize Firebase
@@ -28,3 +30,4 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 
 export { app, db, auth, storage };
+
