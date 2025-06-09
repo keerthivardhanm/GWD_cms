@@ -13,15 +13,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent } from "@/components/ui/card";
 import { db } from '@/lib/firebase';
-import { collection, getDocs, QueryDocumentSnapshot, DocumentData, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, QueryDocumentSnapshot, DocumentData, Timestamp, query, orderBy } from 'firebase/firestore';
 
 interface AuditLog {
   id: string;
   user: string;
   action: string;
-  entity: string;
+  entityType: string; // Renamed from entity for clarity
+  entityId: string;
+  entityName?: string;
   timestamp: string; // Display string
-  details: string;
+  details: Record<string, any> | string; // Can be an object or string
 }
 
 export default function AuditLogsPage() {
@@ -35,16 +37,19 @@ export default function AuditLogsPage() {
       setLoading(true);
       setError(null);
       try {
-        const querySnapshot = await getDocs(collection(db, "auditLogs"));
+        const auditLogsQuery = query(collection(db, "auditLogs"), orderBy("timestamp", "desc"));
+        const querySnapshot = await getDocs(auditLogsQuery);
         const logsData = querySnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => {
           const data = doc.data();
           return {
             id: doc.id,
-            user: data.user || 'Unknown User',
+            user: data.userName || data.userId || 'Unknown User', // Prefer userName if available
             action: data.action || 'Unknown Action',
-            entity: data.entity || 'N/A',
+            entityType: data.entityType || 'N/A',
+            entityId: data.entityId || 'N/A',
+            entityName: data.entityName || data.entityId,
             timestamp: data.timestamp instanceof Timestamp ? data.timestamp.toDate().toLocaleString() : (data.timestamp || 'N/A'),
-            details: data.details || '',
+            details: data.details || {}, // Keep as object or string
           } as AuditLog;
         });
         setAuditLogs(logsData);
@@ -58,6 +63,16 @@ export default function AuditLogsPage() {
 
     fetchAuditLogs();
   }, []);
+
+  const formatDetails = (details: Record<string, any> | string): string => {
+    if (typeof details === 'string') {
+      return details;
+    }
+    if (typeof details === 'object' && details !== null) {
+      return JSON.stringify(details);
+    }
+    return '';
+  };
 
   return (
     <div className="space-y-6">
@@ -140,9 +155,10 @@ export default function AuditLogsPage() {
                   <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Action</TableHead>
-                    <TableHead className="min-w-[200px]">Entity</TableHead>
+                    <TableHead className="min-w-[150px]">Entity Type</TableHead>
+                    <TableHead className="min-w-[200px]">Entity Name/ID</TableHead>
                     <TableHead className="hidden lg:table-cell min-w-[200px]">Details</TableHead>
-                    <TableHead className="text-right">Timestamp</TableHead>
+                    <TableHead className="text-right min-w-[150px]">Timestamp</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -150,8 +166,11 @@ export default function AuditLogsPage() {
                     <TableRow key={log.id}>
                       <TableCell className="font-medium">{log.user}</TableCell>
                       <TableCell>{log.action}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">{log.entity}</TableCell>
-                      <TableCell className="hidden lg:table-cell text-muted-foreground text-xs truncate max-w-xs">{log.details}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{log.entityType}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{log.entityName || log.entityId}</TableCell>
+                      <TableCell className="hidden lg:table-cell text-muted-foreground text-xs truncate max-w-xs">
+                        {formatDetails(log.details)}
+                      </TableCell>
                       <TableCell className="text-right text-muted-foreground text-xs">{log.timestamp}</TableCell>
                     </TableRow>
                   ))}
@@ -164,3 +183,4 @@ export default function AuditLogsPage() {
     </div>
   );
 }
+
