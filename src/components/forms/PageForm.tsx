@@ -10,19 +10,36 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { Page, HomePage, AboutUsPage } from '@/app/(app)/pages/page'; // Import Page types
+import type { Page, HomePage, AboutUsPage, AdmissionsPage, ContactPage, ProgramsListingPage, IndividualProgramPage } from '@/app/(app)/pages/page'; // Import Page types
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { HomePageContentSchema, HomePageContentType } from '@/schemas/pages/homePageSchema';
 import { AboutUsPageContentSchema, AboutUsPageContentType } from '@/schemas/pages/aboutUsPageSchema';
+import { AdmissionsPageContentSchema, AdmissionsPageContentType } from '@/schemas/pages/admissionsPageSchema';
+import { ContactPageContentSchema, ContactPageContentType } from '@/schemas/pages/contactPageSchema';
+import { ProgramsListingPageContentSchema, ProgramsListingPageContentType } from '@/schemas/pages/programsListingPageSchema';
+import { IndividualProgramPageContentSchema, IndividualProgramPageContentType } from '@/schemas/pages/individualProgramPageSchema';
+
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, Trash2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const pageStatuses = ["Draft", "Published", "Review"] as const;
 export type PageStatus = typeof pageStatuses[number];
 
-export const pageTypes = ["generic", "home", "about-us", "admissions", "programs", "program-detail", "centres", "centre-detail", "contact", "enquiry"] as const;
+export const pageTypes = [
+    "generic", 
+    "home", 
+    "about-us", 
+    "admissions", 
+    "programs", // Programs Listing
+    "program-detail", // Individual Program
+    "centres", // Centres Overview
+    "centre-detail", // Individual Centre
+    "contact", 
+    "enquiry"
+] as const;
 export type PageType = typeof pageTypes[number];
 
 
@@ -35,17 +52,13 @@ const basePageFormSchema = z.object({
   pageType: z.enum(pageTypes).default('generic'),
 });
 
-// Combined schema for validation, actual content structure is handled separately
+// Placeholder for dynamic content validation - specific fields will be added based on pageType
 const pageFormValidationSchema = basePageFormSchema.extend({
-  // For HomePage content - only validate a few representative fields for form structure example
-  homeHeroHeading: z.string().optional(),
-  homeWhyChooseIntroHeading: z.string().optional(),
-  // Add more specific fields for other page types if needed for direct form validation
+  content: z.any().optional(), // General placeholder, specific schemas will be used for parsing
 });
 
 
-export type PageFormValues = z.infer<typeof basePageFormSchema>; // Base values for the form
-                                                               // Content will be handled separately
+export type PageFormValues = z.infer<typeof basePageFormSchema>;
 
 interface PageFormProps {
   onSubmit: (values: PageFormValues, pageType: PageType, content?: any) => Promise<void>;
@@ -67,17 +80,15 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
   
   const [currentContentType, setCurrentContentType] = useState<PageType>(initialData?.pageType || 'generic');
 
-  const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch, setError, clearErrors, reset } = useForm<z.infer<typeof pageFormValidationSchema>>({
-    resolver: zodResolver(pageFormValidationSchema),
+  const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch, setError, clearErrors, reset, getValues } = useForm<z.infer<typeof pageFormValidationSchema>>({
+    resolver: zodResolver(pageFormValidationSchema), // Use the extended schema for validation structure
     defaultValues: {
       title: initialData?.title || '',
       slug: initialData?.slug || '',
       status: initialData?.status || 'Draft',
       author: initialData?.author || 'Admin',
       pageType: initialData?.pageType || 'generic',
-      // Initialize specific fields for 'home' pageType if editing
-      homeHeroHeading: initialData?.pageType === 'home' ? (initialData as HomePage).content?.heroSection?.slides?.[0]?.heading || '' : '',
-      homeWhyChooseIntroHeading: initialData?.pageType === 'home' ? (initialData as HomePage).content?.whyChoose?.introHeading || '' : '',
+      content: initialData?.content || {},
     },
   });
   
@@ -88,57 +99,94 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
   const [isCheckingSlug, setIsCheckingSlug] = useState(false);
   const [slugError, setSlugCustomError] = useState<string | null>(null);
 
-  // For managing Hero Slides for Home Page
-  const { fields: heroSlidesFields, append: appendHeroSlide, remove: removeHeroSlide } = useFieldArray({
-    control,
-    name: "content.heroSection.slides" as any, // Adjust name to match nested structure
-  });
+  // Home Page Arrays
+  const { fields: heroSlidesFields, append: appendHeroSlide, remove: removeHeroSlide } = useFieldArray({ control, name: "content.heroSection.slides" });
+  const { fields: whyChooseFeaturesFields, append: appendWhyChooseFeature, remove: removeWhyChooseFeature } = useFieldArray({ control, name: "content.whyChoose.features" });
+  const { fields: homeProgramsFields, append: appendHomeProgram, remove: removeHomeProgram } = useFieldArray({ control, name: "content.programsList.programs" });
+  const { fields: countersFields, append: appendCounter, remove: removeCounter } = useFieldArray({ control, name: "content.counters.counters" });
+  const { fields: homeCentresFields, append: appendHomeCentre, remove: removeHomeCentre } = useFieldArray({ control, name: "content.centres.centres" });
+  const { fields: accreditationsFields, append: appendAccreditation, remove: removeAccreditation } = useFieldArray({ control, name: "content.accreditations.logos" });
+  const { fields: globalPartnershipsFields, append: appendGlobalPartnership, remove: removeGlobalPartnership } = useFieldArray({ control, name: "content.globalPartnerships.partners" });
+  
+  // Admissions Page Arrays
+  const { fields: applicationStepsFields, append: appendApplicationStep, remove: removeApplicationStep } = useFieldArray({ control, name: "content.applicationSteps.steps" });
+  const { fields: admissionsFaqsFields, append: appendAdmissionsFaq, remove: removeAdmissionsFaq } = useFieldArray({ control, name: "content.admissionsFaq.faqs" });
+
+  // About Us Page Arrays
+  const { fields: missionPointsFields, append: appendMissionPoint, remove: removeMissionPoint } = useFieldArray({ control, name: "content.visionMission.missionPoints" });
+  const { fields: timelineEventsFields, append: appendTimelineEvent, remove: removeTimelineEvent } = useFieldArray({ control, name: "content.timelineSection.events" });
+
+  // Programs Listing Page Arrays
+  const { fields: programTabsFields, append: appendProgramTab, remove: removeProgramTab } = useFieldArray({ control, name: "content.programTabs.tabs" });
+  const { fields: programCardsFields, append: appendProgramCard, remove: removeProgramCard } = useFieldArray({ control, name: "content.programCards.programs" });
+  
+  // Individual Program Page Arrays
+  const { fields: programHighlightsFields, append: appendProgramHighlight, remove: removeProgramHighlight } = useFieldArray({ control, name: "content.overviewSection.highlights" });
+  const { fields: programYear1SubjectsFields, append: appendProgramYear1Subject, remove: removeProgramYear1Subject } = useFieldArray({ control, name: "content.curriculumSection.yearWiseSubjects.year1" });
+  const { fields: programYear2SubjectsFields, append: appendProgramYear2Subject, remove: removeProgramYear2Subject } = useFieldArray({ control, name: "content.curriculumSection.yearWiseSubjects.year2" });
+  const { fields: programYear3SubjectsFields, append: appendProgramYear3Subject, remove: removeProgramYear3Subject } = useFieldArray({ control, name: "content.curriculumSection.yearWiseSubjects.year3" });
+  const { fields: careerOpportunitiesFields, append: appendCareerOpportunity, remove: removeCareerOpportunity } = useFieldArray({ control, name: "content.careerOpportunities.careers" });
+  const { fields: programFaqsFields, append: appendProgramFaq, remove: removeProgramFaq } = useFieldArray({ control, name: "content.programFaqs.faqs" });
+
+  // Centres Overview Page Arrays
+  const { fields: centreCardsFields, append: appendCentreCard, remove: removeCentreCard } = useFieldArray({ control, name: "content.centreCards.centres" });
+
+  // Individual Centre Page Arrays
+  const { fields: centreFeaturesFields, append: appendCentreFeature, remove: removeCentreFeature } = useFieldArray({ control, name: "content.centreInfo.features" });
+  
+  // Enquiry Page Arrays
+  const { fields: enquiryFormFields, append: appendEnquiryFormField, remove: removeEnquiryFormField } = useFieldArray({ control, name: "content.enquiryForm.fields" });
 
 
   useEffect(() => {
-     setCurrentContentType(watchedPageType);
-     // Reset form with potentially new default values when pageType changes
-     let defaultContentValues = {};
-     if (watchedPageType === 'home') {
-        const homeContent = (initialData?.pageType === 'home' ? (initialData as HomePage).content : HomePageContentSchema.parse({})) || {};
-        defaultContentValues = {
-          homeHeroHeading: homeContent.heroSection?.slides?.[0]?.heading || '',
-          homeWhyChooseIntroHeading: homeContent.whyChoose?.introHeading || '',
-          // ... other home fields
-        };
-     } else if (watchedPageType === 'about-us') {
-        // defaultContentValues for about-us
-     }
-      reset({
-        title: initialData?.title || watchedTitle || '',
-        slug: initialData?.slug || (watchedTitle ? generateSlug(watchedTitle) : '') || '',
-        status: initialData?.status || 'Draft',
-        author: initialData?.author || 'Admin',
-        pageType: watchedPageType,
-        ...defaultContentValues,
-        // Reset specific content fields based on new pageType
-        // For example, if switching away from 'home', clear home-specific fields
-        homeHeroHeading: watchedPageType === 'home' ? ((initialData?.pageType === 'home' ? (initialData as HomePage).content?.heroSection?.slides?.[0]?.heading : '') || '') : '',
-        homeWhyChooseIntroHeading: watchedPageType === 'home' ? ((initialData?.pageType === 'home' ? (initialData as HomePage).content?.whyChoose?.introHeading : '') || '') : '',
-      });
+    const newPageType = watchedPageType || 'generic';
+    setCurrentContentType(newPageType);
 
-      // Populate hero slides if initialData is for home page
-      if (initialData?.pageType === 'home' && watchedPageType === 'home') {
-        const homeData = initialData as HomePage;
-        if (homeData.content?.heroSection?.slides) {
-          setValue('content.heroSection.slides' as any, homeData.content.heroSection.slides);
-        }
-      }
+    const currentValues = getValues();
+    let newContentDefaults = {};
 
+    switch (newPageType) {
+        case 'home':
+            newContentDefaults = initialData?.pageType === 'home' ? (initialData as HomePage).content : HomePageContentSchema.parse({});
+            break;
+        case 'about-us':
+            newContentDefaults = initialData?.pageType === 'about-us' ? (initialData as AboutUsPage).content : AboutUsPageContentSchema.parse({});
+            break;
+        case 'admissions':
+            newContentDefaults = initialData?.pageType === 'admissions' ? (initialData as AdmissionsPage).content : AdmissionsPageContentSchema.parse({});
+            break;
+        case 'contact':
+            newContentDefaults = initialData?.pageType === 'contact' ? (initialData as ContactPage).content : ContactPageContentSchema.parse({});
+            break;
+        case 'programs':
+             newContentDefaults = initialData?.pageType === 'programs' ? (initialData as ProgramsListingPage).content : ProgramsListingPageContentSchema.parse({});
+             break;
+        case 'program-detail':
+             newContentDefaults = initialData?.pageType === 'program-detail' ? (initialData as IndividualProgramPage).content : IndividualProgramPageContentSchema.parse({});
+             break;
+        // Add cases for other page types and their default schemas
+        default:
+            newContentDefaults = initialData?.pageType === 'generic' ? initialData.content : {};
+            break;
+    }
+    
+    reset({
+        title: currentValues.title || initialData?.title || '',
+        slug: currentValues.slug || initialData?.slug || (currentValues.title ? generateSlug(currentValues.title) : ''),
+        status: currentValues.status || initialData?.status || 'Draft',
+        author: currentValues.author || initialData?.author || 'Admin',
+        pageType: newPageType,
+        content: newContentDefaults,
+    });
 
-  }, [watchedPageType, initialData, reset, setValue, watchedTitle]);
+  }, [watchedPageType, initialData, reset, getValues]);
 
 
   useEffect(() => {
-    if (watchedTitle && !initialData?.slug && !initialData?.title) {
+    if (watchedTitle && !initialData?.slug && !initialData?.title && !getValues("slug")) { // Only set slug if it's not already set by user or initialData
       setValue("slug", generateSlug(watchedTitle), { shouldValidate: true });
     }
-  }, [watchedTitle, setValue, initialData]);
+  }, [watchedTitle, setValue, initialData, getValues]);
 
   const checkSlugUniqueness = useCallback(
     async (slugToCheck: string) => {
@@ -198,33 +246,101 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
     };
 
     let pageContent: any = {};
+    const contentFromForm = data.content || {};
 
-    if (data.pageType === 'home') {
-      pageContent = HomePageContentSchema.parse({
-        heroSection: {
-          slides: (data as any)['content.heroSection.slides']?.map((slide: any) => ({ // Use field array data
-            heading: slide.heading,
-            paragraph: slide.paragraph,
-            imgSrc: slide.imgSrc,
-            alt: slide.alt,
-            btnText: slide.btnText,
-            btnLink: slide.btnLink,
-          })) || (initialData?.pageType === 'home' ? (initialData as HomePage).content.heroSection?.slides : [])
-        },
-        whyChoose: {
-          introHeading: data.homeWhyChooseIntroHeading || (initialData?.pageType === 'home' ? (initialData as HomePage).content.whyChoose?.introHeading : undefined),
-          // ... parse other 'whyChoose' fields if you add inputs for them
-        },
-        // ... parse other sections for Home Page
-      });
-    } else if (data.pageType === 'about-us') {
-      // pageContent = AboutUsPageContentSchema.parse({ ... initialData content if exists });
-      // ... logic to gather content for 'about-us' page from form fields
+    try {
+        switch (data.pageType) {
+            case 'home':
+                pageContent = HomePageContentSchema.parse(contentFromForm);
+                break;
+            case 'about-us':
+                pageContent = AboutUsPageContentSchema.parse(contentFromForm);
+                break;
+            case 'admissions':
+                pageContent = AdmissionsPageContentSchema.parse(contentFromForm);
+                break;
+            case 'contact':
+                pageContent = ContactPageContentSchema.parse(contentFromForm);
+                break;
+            case 'programs':
+                pageContent = ProgramsListingPageContentSchema.parse(contentFromForm);
+                break;
+            case 'program-detail':
+                pageContent = IndividualProgramPageContentSchema.parse(contentFromForm);
+                break;
+            // Add cases for other page types to parse their specific content
+            default: // 'generic' or other types not yet specifically handled
+                pageContent = contentFromForm; // Pass through for generic or unparsed types
+                break;
+        }
+    } catch (e) {
+        if (e instanceof z.ZodError) {
+            console.error("Content validation error:", e.errors);
+            toast({
+                title: "Content Validation Error",
+                description: `There are issues with the content for page type "${data.pageType}". Check console for details.`,
+                variant: "destructive"
+            });
+            return; // Stop submission if content parsing fails
+        }
+        throw e; // Re-throw other errors
     }
-    // Add more else if blocks for other page types
-
     onSubmit(baseValues, data.pageType, pageContent);
   };
+
+
+  const renderFieldArray = (
+    fields: any[], 
+    removeFn: (index: number) => void, 
+    appendFn: (value: any) => void, 
+    baseName: string, 
+    itemSchema: Record<string, { label: string; type: 'input' | 'textarea' | 'select', options?: string[], placeholder?: string }>,
+    itemDefault: any,
+    sectionTitle: string
+  ) => (
+    <Card className="my-4">
+      <CardHeader>
+        <CardTitle className="text-md">{sectionTitle}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {fields.map((field, index) => (
+          <Card key={field.id} className="p-3 bg-muted/50">
+            <div className="space-y-2">
+              {Object.entries(itemSchema).map(([key, schema]) => (
+                <div key={key}>
+                  <Label htmlFor={`${baseName}.${index}.${key}`}>{schema.label}</Label>
+                  {schema.type === 'textarea' ? (
+                    <Textarea {...register(`${baseName}.${index}.${key}` as const)} placeholder={schema.placeholder || `Enter ${schema.label.toLowerCase()}`} />
+                  ) : schema.type === 'select' && schema.options ? (
+                     <Controller
+                        name={`${baseName}.${index}.${key}` as const}
+                        control={control}
+                        render={({ field: selectField }) => (
+                           <Select onValueChange={selectField.onChange} defaultValue={selectField.value}>
+                            <SelectTrigger><SelectValue placeholder={`Select ${schema.label.toLowerCase()}`} /></SelectTrigger>
+                            <SelectContent>
+                              {schema.options?.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                  ) : (
+                    <Input {...register(`${baseName}.${index}.${key}` as const)} placeholder={schema.placeholder || `Enter ${schema.label.toLowerCase()}`} />
+                  )}
+                </div>
+              ))}
+            </div>
+            <Button type="button" variant="destructive" size="sm" onClick={() => removeFn(index)} className="mt-2">
+              <Trash2 className="mr-1 h-3 w-3"/> Remove Item
+            </Button>
+          </Card>
+        ))}
+        <Button type="button" variant="outline" size="sm" onClick={() => appendFn(itemDefault)}>
+          <PlusCircle className="mr-1 h-3 w-3"/> Add Item
+        </Button>
+      </CardContent>
+    </Card>
+  );
 
 
   return (
@@ -238,7 +354,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
 
         <div>
           <Label htmlFor="slug">Slug</Label>
-          <Input id="slug" {...register("slug")} placeholder="e.g., my-awesome-page" />
+          <Input id="slug" {...register("slug")} placeholder="e.g., my-awesome-page or programs/my-program" />
           {errors.slug && <p className="text-sm text-destructive mt-1">{errors.slug.message}</p>}
           {!errors.slug && slugError && <p className="text-sm text-destructive mt-1">{slugError}</p>}
           {isCheckingSlug && <p className="text-sm text-muted-foreground mt-1">Checking slug...</p>}
@@ -251,7 +367,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
             name="pageType"
             control={control}
             render={({ field }) => (
-              <Select onValueChange={(value) => { field.onChange(value); setCurrentContentType(value as PageType);}} defaultValue={field.value}>
+              <Select onValueChange={(value) => { field.onChange(value); }} defaultValue={field.value}>
                 <SelectTrigger id="pageType">
                   <SelectValue placeholder="Select page type" />
                 </SelectTrigger>
@@ -295,69 +411,356 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
 
         {/* Content fields based on pageType */}
         {currentContentType === 'home' && (
-          <div className="space-y-4 border-t pt-4 mt-4">
-            <h3 className="text-lg font-semibold">Home Page Content</h3>
-            
-            {/* Hero Section */}
-            <div className="space-y-2 p-3 border rounded-md">
-              <Label className="text-md font-medium">Hero Section</Label>
-              {heroSlidesFields.map((item, index) => (
-                <div key={item.id} className="space-y-2 p-2 border rounded">
-                  <Label htmlFor={`content.heroSection.slides.${index}.heading`}>Slide {index + 1} Heading</Label>
-                  <Input {...register(`content.heroSection.slides.${index}.heading` as any)} placeholder="Hero slide heading" />
-                  
-                  <Label htmlFor={`content.heroSection.slides.${index}.paragraph`}>Slide {index + 1} Paragraph</Label>
-                  <Textarea {...register(`content.heroSection.slides.${index}.paragraph` as any)} placeholder="Hero slide paragraph" />
+          <Card className="border-t pt-4 mt-4">
+            <CardHeader><CardTitle className="text-lg">Home Page Content</CardTitle></CardHeader>
+            <CardContent>
+              {/* Hero Section */}
+              {renderFieldArray(
+                heroSlidesFields, removeHeroSlide, appendHeroSlide, "content.heroSection.slides",
+                { 
+                  heading: { label: "Heading", type: 'input', placeholder: "Hero slide heading" },
+                  paragraph: { label: "Paragraph", type: 'textarea', placeholder: "Hero slide paragraph" },
+                  imgSrc: { label: "Image URL", type: 'input', placeholder: "https://example.com/image.jpg" },
+                  alt: { label: "Image Alt Text", type: 'input', placeholder: "Image alt text" },
+                  btnText: { label: "Button Text", type: 'input', placeholder: "Learn More" },
+                  btnLink: { label: "Button Link", type: 'input', placeholder: "/about-us" },
+                },
+                { heading: '', paragraph: '', imgSrc: '', alt: '', btnText: '', btnLink: '' },
+                "Hero Slides"
+              )}
+              {/* Why Choose Section */}
+              <Card className="my-4"><CardHeader><CardTitle className="text-md">Why Choose Apollo</CardTitle></CardHeader>
+                <CardContent>
+                  <div><Label htmlFor="content.whyChoose.introHeading">Intro Heading</Label><Input {...register("content.whyChoose.introHeading")} placeholder="Why Choose Us?" /></div>
+                  <div><Label htmlFor="content.whyChoose.introParagraph">Intro Paragraph</Label><Textarea {...register("content.whyChoose.introParagraph")} placeholder="Detailed description..." /></div>
+                  {renderFieldArray(
+                    whyChooseFeaturesFields, removeWhyChooseFeature, appendWhyChooseFeature, "content.whyChoose.features",
+                    {
+                      iconSrc: { label: "Icon Source (e.g., lucide:Home)", type: 'input', placeholder: "lucide:Award" },
+                      title: { label: "Feature Title", type: 'input' },
+                      description: { label: "Feature Description", type: 'textarea' },
+                    },
+                    { iconSrc: '', title: '', description: '' },
+                    "Features"
+                  )}
+                </CardContent>
+              </Card>
+              {/* Programs Section */}
+              <Card className="my-4"><CardHeader><CardTitle className="text-md">Programs List Section</CardTitle></CardHeader>
+                <CardContent>
+                    <div><Label htmlFor="content.programsList.sectionHeading">Section Heading</Label><Input {...register("content.programsList.sectionHeading")} /></div>
+                    <div><Label htmlFor="content.programsList.sectionIntro">Section Intro</Label><Textarea {...register("content.programsList.sectionIntro")} /></div>
+                    {renderFieldArray(
+                        homeProgramsFields, removeHomeProgram, appendHomeProgram, "content.programsList.programs",
+                        {
+                            imgSrc: { label: "Image URL", type: 'input' }, alt: { label: "Image Alt", type: 'input' },
+                            title: { label: "Program Title", type: 'input' }, description: { label: "Program Description", type: 'textarea' },
+                            btnLink: { label: "Button Link", type: 'input' }
+                        },
+                        { imgSrc: '', alt: '', title: '', description: '', btnLink: '' }, "Programs"
+                    )}
+                </CardContent>
+              </Card>
+              {/* Counters */}
+               {renderFieldArray(
+                    countersFields, removeCounter, appendCounter, "content.counters.counters",
+                    { value: { label: "Counter Value", type: 'input' }, label: { label: "Counter Label", type: 'input' }},
+                    { value: '', label: '' }, "Counters"
+                )}
+              {/* Centres Section */}
+              <Card className="my-4"><CardHeader><CardTitle className="text-md">Centres Section</CardTitle></CardHeader>
+                <CardContent>
+                    <div><Label htmlFor="content.centres.sectionHeading">Section Heading</Label><Input {...register("content.centres.sectionHeading")} /></div>
+                    {renderFieldArray(
+                        homeCentresFields, removeHomeCentre, appendHomeCentre, "content.centres.centres",
+                        {
+                            imgSrc: { label: "Image URL", type: 'input' }, alt: { label: "Image Alt", type: 'input' },
+                            name: { label: "Centre Name", type: 'input' }, description: { label: "Centre Description", type: 'textarea' },
+                            btnLink: { label: "Button Link", type: 'input' }
+                        },
+                        { imgSrc: '', alt: '', name: '', description: '', btnLink: '' }, "Centres"
+                    )}
+                </CardContent>
+              </Card>
+              {/* Accreditations */}
+              {renderFieldArray(
+                  accreditationsFields, removeAccreditation, appendAccreditation, "content.accreditations.logos",
+                  { imgSrc: { label: "Logo Image URL", type: 'input' }, alt: { label: "Logo Alt", type: 'input' }, name: { label: "Accreditation Name", type: 'input' }},
+                  { imgSrc: '', alt: '', name: '' }, "Accreditation Logos"
+              )}
+              {/* Global Partnerships */}
+              <Card className="my-4"><CardHeader><CardTitle className="text-md">Global Partnerships Section</CardTitle></CardHeader>
+                <CardContent>
+                    <div><Label htmlFor="content.globalPartnerships.sectionHeading">Section Heading</Label><Input {...register("content.globalPartnerships.sectionHeading")} /></div>
+                    {renderFieldArray(
+                        globalPartnershipsFields, removeGlobalPartnership, appendGlobalPartnership, "content.globalPartnerships.partners",
+                        { imgSrc: { label: "Partner Logo URL", type: 'input' }, alt: { label: "Partner Alt", type: 'input' }, name: { label: "Partner Name", type: 'input' }},
+                        { imgSrc: '', alt: '', name: '' }, "Partners"
+                    )}
+                </CardContent>
+              </Card>
+              {/* Enquire CTA */}
+              <Card className="my-4"><CardHeader><CardTitle className="text-md">Enquire CTA Section</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                    <div><Label htmlFor="content.ctaSection.heading">Heading</Label><Input {...register("content.ctaSection.heading")} /></div>
+                    <div><Label htmlFor="content.ctaSection.buttonText">Button Text</Label><Input {...register("content.ctaSection.buttonText")} /></div>
+                    <div><Label htmlFor="content.ctaSection.buttonLink">Button Link</Label><Input {...register("content.ctaSection.buttonLink")} /></div>
+                </CardContent>
+              </Card>
+            </CardContent>
+          </Card>
+        )}
 
-                  <Label htmlFor={`content.heroSection.slides.${index}.imgSrc`}>Slide {index + 1} Image URL</Label>
-                  <Input {...register(`content.heroSection.slides.${index}.imgSrc` as any)} placeholder="https://example.com/image.jpg" />
-                  
-                  <Label htmlFor={`content.heroSection.slides.${index}.alt`}>Slide {index + 1} Image Alt Text</Label>
-                  <Input {...register(`content.heroSection.slides.${index}.alt` as any)} placeholder="Image alt text" />
-
-                  <Label htmlFor={`content.heroSection.slides.${index}.btnText`}>Slide {index + 1} Button Text</Label>
-                  <Input {...register(`content.heroSection.slides.${index}.btnText` as any)} placeholder="Learn More" />
-
-                  <Label htmlFor={`content.heroSection.slides.${index}.btnLink`}>Slide {index + 1} Button Link</Label>
-                  <Input {...register(`content.heroSection.slides.${index}.btnLink` as any)} placeholder="https://example.com/learn" />
-                  
-                  <Button type="button" variant="destructive" size="sm" onClick={() => removeHeroSlide(index)}>
-                    <Trash2 className="mr-1 h-3 w-3"/> Remove Slide
-                  </Button>
-                </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => appendHeroSlide({ heading: '', paragraph: '', imgSrc: '', alt: '', btnText: '', btnLink: '' })}>
-                <PlusCircle className="mr-1 h-3 w-3"/> Add Hero Slide
-              </Button>
-            </div>
-
-            {/* Why Choose Section */}
-            <div className="space-y-2 p-3 border rounded-md">
-              <Label className="text-md font-medium">Why Choose Apollo Section</Label>
-              <div>
-                <Label htmlFor="homeWhyChooseIntroHeading">Intro Heading</Label>
-                <Input id="homeWhyChooseIntroHeading" {...register("homeWhyChooseIntroHeading")} placeholder="Why Choose Us?" />
-              </div>
-              {/* Add more fields for features array here if needed, similar to Hero Slides */}
-            </div>
-            {/* Add more collapsible sections for other Home Page content parts */}
-          </div>
+        {currentContentType === 'admissions' && (
+          <Card className="border-t pt-4 mt-4">
+            <CardHeader><CardTitle className="text-lg">Admissions Page Content</CardTitle></CardHeader>
+            <CardContent>
+              {/* Application Steps */}
+              <Card className="my-4"><CardHeader><CardTitle className="text-md">Application Steps</CardTitle></CardHeader>
+                <CardContent>
+                  <div><Label htmlFor="content.applicationSteps.mainHeading">Main Heading</Label><Input {...register("content.applicationSteps.mainHeading")} /></div>
+                  {renderFieldArray(
+                    applicationStepsFields, removeApplicationStep, appendApplicationStep, "content.applicationSteps.steps",
+                    {
+                      number: { label: "Step Number", type: 'input', placeholder: "e.g., 1 or Step One" },
+                      title: { label: "Step Title", type: 'input' },
+                      description: { label: "Step Description", type: 'textarea' },
+                    },
+                    { number: '', title: '', description: '' },
+                    "Steps"
+                  )}
+                </CardContent>
+              </Card>
+              {/* FAQ Section */}
+              <Card className="my-4"><CardHeader><CardTitle className="text-md">FAQ Section</CardTitle></CardHeader>
+                <CardContent>
+                  <div><Label htmlFor="content.admissionsFaq.sectionHeading">Section Heading</Label><Input {...register("content.admissionsFaq.sectionHeading")} /></div>
+                  {renderFieldArray(
+                    admissionsFaqsFields, removeAdmissionsFaq, appendAdmissionsFaq, "content.admissionsFaq.faqs",
+                    {
+                      question: { label: "Question", type: 'input' },
+                      answer: { label: "Answer", type: 'textarea' },
+                    },
+                    { question: '', answer: '' },
+                    "FAQs"
+                  )}
+                </CardContent>
+              </Card>
+              {/* Eligibility & Info CTA */}
+              <Card className="my-4"><CardHeader><CardTitle className="text-md">Eligibility & Info CTA</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  <div><Label htmlFor="content.eligibilitySection.eligibilityCriteria">Eligibility Criteria</Label><Textarea {...register("content.eligibilitySection.eligibilityCriteria")} /></div>
+                  <div><Label htmlFor="content.eligibilitySection.durationInfo">Duration Info</Label><Input {...register("content.eligibilitySection.durationInfo")} /></div>
+                  <div><Label htmlFor="content.eligibilitySection.feeStructure">Fee Structure</Label><Input {...register("content.eligibilitySection.feeStructure")} /></div>
+                  <div><Label htmlFor="content.eligibilitySection.buttonText">Button Text</Label><Input {...register("content.eligibilitySection.buttonText")} /></div>
+                  <div><Label htmlFor="content.eligibilitySection.buttonLink">Button Link</Label><Input {...register("content.eligibilitySection.buttonLink")} /></div>
+                </CardContent>
+              </Card>
+            </CardContent>
+          </Card>
         )}
 
         {currentContentType === 'about-us' && (
-          <div className="space-y-4 border-t pt-4 mt-4">
-            <h3 className="text-lg font-semibold">About Us Page Content</h3>
-            {/* Add form fields for About Us page schema here */}
-            {/* Example:
-            <div>
-              <Label htmlFor="aboutBannerHeading">Banner Heading</Label>
-              <Input id="aboutBannerHeading" {...register("aboutContent.banner.heading" as any)} />
-            </div>
-            */}
-             <p className="text-sm text-muted-foreground">About Us content fields will go here.</p>
-          </div>
+          <Card className="border-t pt-4 mt-4">
+            <CardHeader><CardTitle className="text-lg">About Us Page Content</CardTitle></CardHeader>
+            <CardContent>
+                {/* Banner */}
+                <Card className="my-4"><CardHeader><CardTitle className="text-md">Banner</CardTitle></CardHeader>
+                    <CardContent className="space-y-2">
+                        <div><Label htmlFor="content.banner.heading">Heading</Label><Input {...register("content.banner.heading")} /></div>
+                        <div><Label htmlFor="content.banner.subheading">Subheading</Label><Input {...register("content.banner.subheading")} /></div>
+                        <div><Label htmlFor="content.banner.backgroundImage">Background Image URL</Label><Input {...register("content.banner.backgroundImage")} /></div>
+                    </CardContent>
+                </Card>
+                {/* Vision & Mission */}
+                <Card className="my-4"><CardHeader><CardTitle className="text-md">Vision & Mission</CardTitle></CardHeader>
+                    <CardContent>
+                        <div><Label htmlFor="content.visionMission.visionText">Vision Text</Label><Textarea {...register("content.visionMission.visionText")} /></div>
+                        {renderFieldArray(
+                            missionPointsFields, removeMissionPoint, appendMissionPoint, "content.visionMission.missionPoints",
+                            { point: { label: "Mission Point", type: 'input' } }, // Simple array of strings, so one field per item
+                            "", // Append an empty string
+                            "Mission Points"
+                        )}
+                    </CardContent>
+                </Card>
+                {/* Timeline / History */}
+                 <Card className="my-4"><CardHeader><CardTitle className="text-md">Timeline / History</CardTitle></CardHeader>
+                    <CardContent>
+                        {renderFieldArray(
+                            timelineEventsFields, removeTimelineEvent, appendTimelineEvent, "content.timelineSection.events",
+                            { year: { label: "Year", type: 'input' }, event: { label: "Event Description", type: 'textarea' }},
+                            { year: '', event: '' }, "Timeline Events"
+                        )}
+                    </CardContent>
+                </Card>
+            </CardContent>
+          </Card>
         )}
-        {/* Add more conditional rendering blocks for other page types */}
+
+        {currentContentType === 'programs' && (
+           <Card className="border-t pt-4 mt-4">
+            <CardHeader><CardTitle className="text-lg">Programs Listing Page Content</CardTitle></CardHeader>
+            <CardContent>
+                {/* Program Categories (Tabs) */}
+                {renderFieldArray(
+                    programTabsFields, removeProgramTab, appendProgramTab, "content.programTabs.tabs",
+                    { title: { label: "Tab Title", type: 'input' }, anchorLink: { label: "Anchor Link (e.g. #category)", type: 'input' } },
+                    { title: '', anchorLink: '' }, "Program Categories (Tabs)"
+                )}
+                {/* Program Cards */}
+                {renderFieldArray(
+                    programCardsFields, removeProgramCard, appendProgramCard, "content.programCards.programs",
+                    {
+                        title: { label: "Program Title", type: 'input' }, imgSrc: { label: "Image URL", type: 'input' },
+                        alt: { label: "Image Alt", type: 'input' }, description: { label: "Description", type: 'textarea' },
+                        duration: { label: "Duration", type: 'input' }, btnLink: { label: "Details Link", type: 'input' }
+                    },
+                    { title: '', imgSrc: '', alt: '', description: '', duration: '', btnLink: '' }, "Program Cards"
+                )}
+            </CardContent>
+           </Card>
+        )}
+
+        {currentContentType === 'program-detail' && (
+            <Card className="border-t pt-4 mt-4">
+                <CardHeader><CardTitle className="text-lg">Individual Program Page Content</CardTitle></CardHeader>
+                <CardContent>
+                    {/* Hero Section */}
+                    <Card className="my-4"><CardHeader><CardTitle className="text-md">Hero Section</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                            <div><Label htmlFor="content.programHero.heading">Heading</Label><Input {...register("content.programHero.heading")} /></div>
+                            <div><Label htmlFor="content.programHero.subheading">Subheading</Label><Input {...register("content.programHero.subheading")} /></div>
+                            <div><Label htmlFor="content.programHero.heroImage">Hero Image URL</Label><Input {...register("content.programHero.heroImage")} /></div>
+                            <div><Label htmlFor="content.programHero.btnText">Button Text</Label><Input {...register("content.programHero.btnText")} /></div>
+                            <div><Label htmlFor="content.programHero.btnLink">Button Link</Label><Input {...register("content.programHero.btnLink")} /></div>
+                        </CardContent>
+                    </Card>
+                    {/* Overview Section */}
+                    <Card className="my-4"><CardHeader><CardTitle className="text-md">Overview</CardTitle></CardHeader>
+                        <CardContent>
+                            <div><Label htmlFor="content.overviewSection.introText">Intro Text</Label><Textarea {...register("content.overviewSection.introText")} /></div>
+                            {renderFieldArray(
+                                programHighlightsFields, removeProgramHighlight, appendProgramHighlight, "content.overviewSection.highlights",
+                                { highlight: {label: "Highlight", type: "input"} }, "", "Highlights" // Array of strings
+                            )}
+                        </CardContent>
+                    </Card>
+                    {/* Curriculum Section */}
+                    <Card className="my-4"><CardHeader><CardTitle className="text-md">Curriculum</CardTitle></CardHeader>
+                        <CardContent>
+                             {renderFieldArray(programYear1SubjectsFields, removeProgramYear1Subject, appendProgramYear1Subject, "content.curriculumSection.yearWiseSubjects.year1", { subject: { label: "Subject", type: 'input'}}, "", "Year 1 Subjects")}
+                             {renderFieldArray(programYear2SubjectsFields, removeProgramYear2Subject, appendProgramYear2Subject, "content.curriculumSection.yearWiseSubjects.year2", { subject: { label: "Subject", type: 'input'}}, "", "Year 2 Subjects")}
+                             {renderFieldArray(programYear3SubjectsFields, removeProgramYear3Subject, appendProgramYear3Subject, "content.curriculumSection.yearWiseSubjects.year3", { subject: { label: "Subject", type: 'input'}}, "", "Year 3 Subjects")}
+                        </CardContent>
+                    </Card>
+                    {/* Eligibility & Duration */}
+                    <Card className="my-4"><CardHeader><CardTitle className="text-md">Eligibility & Duration</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                            <div><Label htmlFor="content.eligibilityDuration.eligibility">Eligibility</Label><Textarea {...register("content.eligibilityDuration.eligibility")} /></div>
+                            <div><Label htmlFor="content.eligibilityDuration.duration">Duration</Label><Input {...register("content.eligibilityDuration.duration")} /></div>
+                        </CardContent>
+                    </Card>
+                    {/* Career Opportunities */}
+                    {renderFieldArray(careerOpportunitiesFields, removeCareerOpportunity, appendCareerOpportunity, "content.careerOpportunities.careers", { career: { label: "Career Opportunity", type: 'input'}}, "", "Career Opportunities")}
+                    {/* Program FAQs */}
+                    {renderFieldArray(programFaqsFields, removeProgramFaq, appendProgramFaq, "content.programFaqs.faqs", { question: { label: "Question", type: 'input' }, answer: { label: "Answer", type: 'textarea'}}, {question: '', answer: ''}, "Program FAQs")}
+                </CardContent>
+            </Card>
+        )}
+        
+        {currentContentType === 'centres' && (
+            <Card className="border-t pt-4 mt-4">
+                <CardHeader><CardTitle className="text-lg">Centres Overview Page Content</CardTitle></CardHeader>
+                <CardContent>
+                    {renderFieldArray(
+                        centreCardsFields, removeCentreCard, appendCentreCard, "content.centreCards.centres",
+                        {
+                            name: {label: "Centre Name", type: 'input'}, imgSrc: {label: "Image URL", type: 'input'},
+                            alt: {label: "Image Alt", type: 'input'}, description: {label: "Description", type: 'textarea'},
+                            btnLink: {label: "Details Link", type: 'input'}
+                        },
+                        {name: '', imgSrc: '', alt: '', description: '', btnLink: ''}, "Centre Cards"
+                    )}
+                </CardContent>
+            </Card>
+        )}
+
+        {currentContentType === 'centre-detail' && (
+            <Card className="border-t pt-4 mt-4">
+                <CardHeader><CardTitle className="text-lg">Individual Centre Page Content</CardTitle></CardHeader>
+                <CardContent>
+                    <Card className="my-4"><CardHeader><CardTitle className="text-md">Centre Info</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                            <div><Label htmlFor="content.centreInfo.heading">Heading</Label><Input {...register("content.centreInfo.heading")} /></div>
+                            <div><Label htmlFor="content.centreInfo.paragraph">Paragraph</Label><Textarea {...register("content.centreInfo.paragraph")} /></div>
+                            {renderFieldArray(
+                                centreFeaturesFields, removeCentreFeature, appendCentreFeature, "content.centreInfo.features",
+                                { icon: {label: "Icon (e.g. lucide:Home)", type: 'input'}, text: {label: "Feature Text", type: 'input'}},
+                                {icon: '', text: ''}, "Features"
+                            )}
+                        </CardContent>
+                    </Card>
+                </CardContent>
+            </Card>
+        )}
+
+
+        {currentContentType === 'contact' && (
+          <Card className="border-t pt-4 mt-4">
+            <CardHeader><CardTitle className="text-lg">Contact Page Content</CardTitle></CardHeader>
+            <CardContent>
+                {/* Contact Form structure (placeholders for fields in the UI) */}
+                <Card className="my-4"><CardHeader><CardTitle className="text-md">Contact Form Fields (Labels)</CardTitle></CardHeader>
+                    <CardContent className="space-y-2">
+                        <div><Label htmlFor="content.contactForm.name">Name Field Label</Label><Input {...register("content.contactForm.name")} placeholder="e.g., Your Name" /></div>
+                        <div><Label htmlFor="content.contactForm.email">Email Field Label</Label><Input {...register("content.contactForm.email")} placeholder="e.g., Your Email" /></div>
+                        <div><Label htmlFor="content.contactForm.phone">Phone Field Label</Label><Input {...register("content.contactForm.phone")} placeholder="e.g., Your Phone" /></div>
+                        <div><Label htmlFor="content.contactForm.message">Message Field Label</Label><Input {...register("content.contactForm.message")} placeholder="e.g., Your Message" /></div>
+                        <div><Label htmlFor="content.contactForm.submitButtonText">Submit Button Text</Label><Input {...register("content.contactForm.submitButtonText")} placeholder="e.g., Send Message" /></div>
+                    </CardContent>
+                </Card>
+                {/* Contact Info Block */}
+                <Card className="my-4"><CardHeader><CardTitle className="text-md">Contact Info Block</CardTitle></CardHeader>
+                    <CardContent className="space-y-2">
+                        <div><Label htmlFor="content.contactInfo.phone">Phone Number</Label><Input {...register("content.contactInfo.phone")} /></div>
+                        <div><Label htmlFor="content.contactInfo.email">Email Address</Label><Input {...register("content.contactInfo.email")} /></div>
+                        <div><Label htmlFor="content.contactInfo.address">Address</Label><Textarea {...register("content.contactInfo.address")} /></div>
+                        <div><Label htmlFor="content.contactInfo.mapEmbed">Map Embed URL (iframe src)</Label><Input {...register("content.contactInfo.mapEmbed")} placeholder="Google Maps embed URL"/></div>
+                    </CardContent>
+                </Card>
+            </CardContent>
+          </Card>
+        )}
+
+        {currentContentType === 'enquiry' && (
+             <Card className="border-t pt-4 mt-4">
+                <CardHeader><CardTitle className="text-lg">Enquiry Page Content</CardTitle></CardHeader>
+                <CardContent>
+                    {renderFieldArray(
+                        enquiryFormFields, removeEnquiryFormField, appendEnquiryFormField, "content.enquiryForm.fields",
+                        {
+                            label: {label: "Field Label", type: 'input'}, name: {label: "Field Name (unique key)", type: 'input'},
+                            inputType: {label: "Input Type", type: 'select', options: ['text', 'email', 'tel', 'textarea', 'select', 'checkbox', 'radio']},
+                            placeholder: {label: "Placeholder (optional)", type: 'input'}
+                        },
+                        {label: '', name: '', inputType: 'text', placeholder: ''}, "Enquiry Form Fields"
+                    )}
+                </CardContent>
+             </Card>
+        )}
+
+
+        {currentContentType === 'generic' && (
+             <Card className="border-t pt-4 mt-4">
+                <CardHeader><CardTitle className="text-lg">Generic Page Content</CardTitle></CardHeader>
+                <CardContent>
+                    <Label htmlFor="content.mainContent">Main Content (Markdown or HTML)</Label>
+                    <Textarea id="content.mainContent" {...register("content.mainContent")} placeholder="Enter content for the generic page..." rows={10}/>
+                    <p className="text-xs text-muted-foreground mt-1">For generic pages, you can use Markdown or basic HTML here. More structured content types offer specific fields.</p>
+                </CardContent>
+            </Card>
+        )}
 
 
         <div className="flex justify-end gap-2 pt-4">
@@ -372,3 +775,5 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
     </ScrollArea>
   );
 }
+
+    

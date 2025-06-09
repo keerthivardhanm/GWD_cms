@@ -18,7 +18,13 @@ import { useToast } from "@/hooks/use-toast";
 import { PageForm, PageFormValues, PageStatus, PageType } from '@/components/forms/PageForm';
 import { HomePageContentType } from '@/schemas/pages/homePageSchema';
 import { AboutUsPageContentType } from '@/schemas/pages/aboutUsPageSchema';
-import { useAuth } from '@/context/AuthContext'; // Import useAuth
+import { AdmissionsPageContentType } from '@/schemas/pages/admissionsPageSchema';
+import { ContactPageContentType } from '@/schemas/pages/contactPageSchema';
+import { ProgramsListingPageContentType } from '@/schemas/pages/programsListingPageSchema';
+import { IndividualProgramPageContentType } from '@/schemas/pages/individualProgramPageSchema';
+// Import other page content type schemas as you create them
+
+import { useAuth } from '@/context/AuthContext';
 
 // Define base page structure
 interface BasePage {
@@ -35,7 +41,7 @@ interface BasePage {
 
 // Define specific page types with their content
 export interface GenericPageData {
-  // Currently no specific fields for generic pages, but can be extended
+  mainContent?: string; // Example for generic markdown/html content
   [key: string]: any; 
 }
 export interface GenericPage extends BasePage {
@@ -53,15 +59,49 @@ export interface AboutUsPage extends BasePage {
   content: AboutUsPageContentType;
 }
 
+export interface AdmissionsPage extends BasePage {
+  pageType: 'admissions';
+  content: AdmissionsPageContentType;
+}
+
+export interface ContactPage extends BasePage {
+  pageType: 'contact';
+  content: ContactPageContentType;
+}
+
+export interface ProgramsListingPage extends BasePage {
+  pageType: 'programs'; // Maps to "Programs Listing"
+  content: ProgramsListingPageContentType;
+}
+
+export interface IndividualProgramPage extends BasePage {
+  pageType: 'program-detail'; // Maps to "Individual Program"
+  content: IndividualProgramPageContentType;
+}
+
+// Add interfaces for other page types:
+// export interface CentresOverviewPage extends BasePage { pageType: 'centres'; content: CentresOverviewContentType; }
+// export interface IndividualCentrePage extends BasePage { pageType: 'centre-detail'; content: IndividualCentreContentType; }
+// export interface EnquiryPage extends BasePage { pageType: 'enquiry'; content: EnquiryPageContentType; }
+
+
 // Union type for all possible page structures
-export type Page = GenericPage | HomePage | AboutUsPage;
+export type Page = 
+  | GenericPage 
+  | HomePage 
+  | AboutUsPage
+  | AdmissionsPage
+  | ContactPage
+  | ProgramsListingPage
+  | IndividualProgramPage;
+  // Add other specific page types to the union
 
 export default function PagesManagementPage() {
   const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { user, userData } = useAuth(); // Get user data for role check
+  const { user, userData } = useAuth(); 
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPage, setEditingPage] = useState<Page | null>(null);
@@ -72,7 +112,7 @@ export default function PagesManagementPage() {
     setLoading(true);
     setError(null);
     try {
-      const pagesQuery = query(collection(db, "pages"), orderBy("createdAt", "desc"));
+      const pagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc")); // Order by updatedAt for most recent first
       const querySnapshot = await getDocs(pagesQuery);
       const pagesData = querySnapshot.docs.map((docSnap: QueryDocumentSnapshot<DocumentData>) => {
         const data = docSnap.data();
@@ -89,16 +129,28 @@ export default function PagesManagementPage() {
           author: data.author || 'Unknown',
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
-          pageType: data.pageType || 'generic', // Default to generic
+          pageType: data.pageType || 'generic',
+          content: data.content || {}, // Ensure content is at least an empty object
         };
-
-        if (baseData.pageType === 'home') {
-          return { ...baseData, pageType: 'home', content: data.content || {} } as HomePage;
-        } else if (baseData.pageType === 'about-us') {
-          return { ...baseData, pageType: 'about-us', content: data.content || {} } as AboutUsPage;
+        
+        // Return the specific page type based on pageType field
+        switch (baseData.pageType) {
+          case 'home':
+            return { ...baseData, content: data.content || {} } as HomePage;
+          case 'about-us':
+            return { ...baseData, content: data.content || {} } as AboutUsPage;
+          case 'admissions':
+            return { ...baseData, content: data.content || {} } as AdmissionsPage;
+          case 'contact':
+            return { ...baseData, content: data.content || {} } as ContactPage;
+          case 'programs':
+            return { ...baseData, content: data.content || {} } as ProgramsListingPage;
+          case 'program-detail':
+            return { ...baseData, content: data.content || {} } as IndividualProgramPage;
+          // Add cases for other page types
+          default:
+            return { ...baseData, content: data.content || {} } as GenericPage;
         }
-        // Add more specific page types here
-        return { ...baseData, pageType: 'generic', content: data.content || {} } as GenericPage;
       });
       setPages(pagesData);
     } catch (err) {
@@ -136,21 +188,27 @@ export default function PagesManagementPage() {
     setIsFormOpen(true);
   };
 
-  const handleFormSubmit = async (values: PageFormValues, pageType: PageType, content?: any) => {
+  const handleFormSubmit = async (values: PageFormValues, pageType: PageType, contentData?: any) => {
     if (!isAdmin) {
       toast({ title: "Permission Denied", description: "You do not have permission to save pages.", variant: "destructive" });
       return;
     }
     try {
       const dataToSave: any = {
-        ...values,
-        pageType,
-        content: content || {}, // Ensure content is an empty object if undefined
+        ...values, // title, slug, status, author, pageType from PageFormValues
+        content: contentData || {}, // Parsed content from PageForm
         updatedAt: serverTimestamp(),
       };
 
       if (editingPage) {
         const pageRef = doc(db, "pages", editingPage.id);
+        // Ensure createdAt is not overwritten if it exists
+        if (editingPage.createdAt) {
+          dataToSave.createdAt = editingPage.createdAt; 
+        } else {
+          // This case should ideally not happen if pages are always created with createdAt
+          dataToSave.createdAt = serverTimestamp(); 
+        }
         await updateDoc(pageRef, dataToSave);
         toast({
           title: "Success",
@@ -260,7 +318,7 @@ export default function PagesManagementPage() {
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">{page.lastModified}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" className="mr-2" onClick={() => alert('Preview not implemented yet.')}>
+                      <Button variant="ghost" size="sm" className="mr-2" onClick={() => alert('Preview not implemented yet. Page slug: ' + page.slug)}>
                         <Eye className="h-4 w-4 mr-1" /> Preview
                       </Button>
                       {isAdmin && (
@@ -318,7 +376,7 @@ export default function PagesManagementPage() {
           setIsFormOpen(isOpen);
           if (!isOpen) setEditingPage(null);
       }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editingPage ? "Edit Page" : "Create New Page"}</DialogTitle>
             <DialogDescription>
@@ -338,3 +396,5 @@ export default function PagesManagementPage() {
     </div>
   );
 }
+
+    
