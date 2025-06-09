@@ -4,10 +4,10 @@ import { z } from 'zod';
 // Define and export the element schema
 export const CentreCardSchema = z.object({
     name: z.string().optional().default(''),
-    imgSrc: z.string().url({ message: "Invalid URL format for image source." }).or(z.literal('')).optional().default(''),
+    imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
     alt: z.string().optional().default(''),
     description: z.string().optional().default(''),
-    btnLink: z.string().optional().default('').describe("Relative or absolute URL to the individual centre page"),
+    btnLink: z.string().or(z.literal('')).optional().default('').describe("Relative or absolute URL to the individual centre page"), // Allow any string
 }); // Removed .default({}) here for the exported schema, so .parse({}) can be used on it
 
 export const CentresOverviewPageContentSchema = z.object({

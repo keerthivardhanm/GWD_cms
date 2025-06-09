@@ -12,9 +12,9 @@ export const IndividualProgramPageContentSchema = z.object({
   programHero: z.object({
     heading: z.string().optional().default(''),
     subheading: z.string().optional().default(''),
-    heroImage: z.string().url({ message: "Invalid URL format for hero image." }).or(z.literal('')).optional().default(''),
+    heroImage: z.string().or(z.literal('')).optional().default(''), // Allow any string
     btnText: z.string().optional().default(''),
-    btnLink: z.string().url({ message: "Invalid URL format for button link." }).or(z.literal('')).optional().default(''),
+    btnLink: z.string().or(z.literal('')).optional().default(''), // Allow any string
   }).optional().default({}),
   overviewSection: z.object({
     introText: z.string().optional().default(''),
@@ -35,7 +35,7 @@ export const IndividualProgramPageContentSchema = z.object({
     careers: z.array(StringListItemSchema).optional().default([]),
   }).optional().default({ careers: [] }),
   programFaqs: z.object({
-    faqs: z.array(FaqItemSchema).optional().default([]), // Now FaqItemSchema is correctly in scope
+    faqs: z.array(FaqItemSchema).optional().default([]),
   }).optional().default({ faqs: [] }),
 }).default({});
 

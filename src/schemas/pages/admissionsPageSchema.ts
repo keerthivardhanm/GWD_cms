@@ -28,7 +28,7 @@ export const AdmissionsPageContentSchema = z.object({
     durationInfo: z.string().optional().default(''),
     feeStructure: z.string().optional().default(''),
     buttonText: z.string().optional().default(''),
-    buttonLink: z.string().url({ message: "Invalid URL format for button link." }).or(z.literal('')).optional().default(''),
+    buttonLink: z.string().or(z.literal('')).optional().default(''), // Allow any string
   }).optional().default({}),
 }).default({});
 

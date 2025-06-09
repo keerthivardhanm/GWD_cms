@@ -2,28 +2,28 @@
 import { z } from 'zod';
 
 export const HeroSlideSchema = z.object({
-  imgSrc: z.string().url({ message: "Invalid URL format for image source." }).or(z.literal('')).optional().default(''),
+  imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
   alt: z.string().optional().default(''),
   heading: z.string().optional().default(''),
   paragraph: z.string().optional().default(''),
   btnText: z.string().optional().default(''),
-  btnLink: z.string().url({ message: "Invalid URL format for button link." }).or(z.literal('')).optional().default(''),
+  btnLink: z.string().or(z.literal('')).optional().default(''), // Allow any string
 }).default({});
 export type HeroSlideType = z.infer<typeof HeroSlideSchema>;
 
 export const WhyChooseFeatureSchema = z.object({
-  iconSrc: z.string().optional().default(''), 
+  iconSrc: z.string().optional().default(''),
   title: z.string().optional().default(''),
   description: z.string().optional().default(''),
 }).default({});
 export type WhyChooseFeatureType = z.infer<typeof WhyChooseFeatureSchema>;
 
 export const ProgramItemSchema = z.object({
-  imgSrc: z.string().url({ message: "Invalid URL format for image source." }).or(z.literal('')).optional().default(''),
+  imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
   alt: z.string().optional().default(''),
   title: z.string().optional().default(''),
   description: z.string().optional().default(''),
-  btnLink: z.string().url({ message: "Invalid URL format for button link." }).or(z.literal('')).optional().default(''),
+  btnLink: z.string().or(z.literal('')).optional().default(''), // Allow any string
 }).default({});
 export type ProgramItemType = z.infer<typeof ProgramItemSchema>;
 
@@ -34,23 +34,23 @@ export const CounterItemSchema = z.object({
 export type CounterItemType = z.infer<typeof CounterItemSchema>;
 
 export const CentreItemSchema = z.object({
-  imgSrc: z.string().url({ message: "Invalid URL format for image source." }).or(z.literal('')).optional().default(''),
+  imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
   alt: z.string().optional().default(''),
   name: z.string().optional().default(''),
   description: z.string().optional().default(''),
-  btnLink: z.string().url({ message: "Invalid URL format for button link." }).or(z.literal('')).optional().default(''),
+  btnLink: z.string().or(z.literal('')).optional().default(''), // Allow any string
 }).default({});
 export type CentreItemType = z.infer<typeof CentreItemSchema>;
 
 export const AccreditationLogoSchema = z.object({
-  imgSrc: z.string().url({ message: "Invalid URL format for image source." }).or(z.literal('')).optional().default(''),
+  imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
   alt: z.string().optional().default(''),
   name: z.string().optional().default(''),
 }).default({});
 export type AccreditationLogoType = z.infer<typeof AccreditationLogoSchema>;
 
 export const GlobalPartnerSchema = z.object({
-  imgSrc: z.string().url({ message: "Invalid URL format for image source." }).or(z.literal('')).optional().default(''),
+  imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
   alt: z.string().optional().default(''),
   name: z.string().optional().default(''),
 }).default({});
@@ -87,7 +87,7 @@ export const HomePageContentSchema = z.object({
   ctaSection: z.object({
     heading: z.string().optional().default(''),
     buttonText: z.string().optional().default(''),
-    buttonLink: z.string().url({ message: "Invalid URL format for CTA button link." }).or(z.literal('')).optional().default(''),
+    buttonLink: z.string().or(z.literal('')).optional().default(''), // Allow any string
   }).optional().default({}),
 }).default({});
 

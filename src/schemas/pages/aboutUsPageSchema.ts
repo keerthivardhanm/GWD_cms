@@ -16,7 +16,7 @@ export const AboutUsPageContentSchema = z.object({
   banner: z.object({
     heading: z.string().optional().default(''),
     subheading: z.string().optional().default(''),
-    backgroundImage: z.string().url({ message: "Invalid URL format for background image." }).or(z.literal('')).optional().default(''),
+    backgroundImage: z.string().or(z.literal('')).optional().default(''), // Allow any string
   }).optional().default({}),
   visionMission: z.object({
     visionText: z.string().optional().default(''),
