@@ -18,13 +18,14 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, QueryDocumentSnapshot, DocumentData, Timestamp, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { UserForm, UserFormValues, UserRole } from '@/components/forms/UserForm';
+import { RoleForm, RoleFormValues } from '@/components/forms/RoleForm'; // New form for roles
 
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
-  lastLogin?: string; 
+  lastLogin?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -34,9 +35,11 @@ export interface Role {
   name: string;
   description: string;
   permissions: string[];
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
-const allPermissions = [
+export const allPermissions = [
     { id: "manage_users", label: "Manage Users" },
     { id: "manage_settings", label: "Manage Global Settings" },
     { id: "manage_content", label: "Create/Edit/Delete Content (Pages, Blocks, Files)" },
@@ -57,6 +60,9 @@ export default function AccessControlPage() {
 
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+
+  const [isRoleFormOpen, setIsRoleFormOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
@@ -90,7 +96,8 @@ export default function AccessControlPage() {
     setLoadingRoles(true);
     setErrorRoles(null);
     try {
-      const querySnapshot = await getDocs(collection(db, "roles"));
+      const rolesQuery = query(collection(db, "roles"), orderBy("name", "asc"));
+      const querySnapshot = await getDocs(rolesQuery);
       const rolesData = querySnapshot.docs.map((docSnap: QueryDocumentSnapshot<DocumentData>) => {
         const data = docSnap.data();
         return {
@@ -98,6 +105,8 @@ export default function AccessControlPage() {
           name: data.name || 'Unknown Role',
           description: data.description || '',
           permissions: Array.isArray(data.permissions) ? data.permissions : [],
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
         } as Role;
       });
       setRoles(rolesData);
@@ -137,6 +146,9 @@ export default function AccessControlPage() {
       } else {
         await addDoc(collection(db, "users"), {
           ...values,
+          // For new users, their actual UID from Firebase Auth should be used as doc ID
+          // This example assumes we are creating a profile manually for now
+          // A proper user creation flow would involve Firebase Auth
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
@@ -162,6 +174,65 @@ export default function AccessControlPage() {
     }
   };
 
+  const handleCreateNewRole = () => {
+    setEditingRole(null);
+    setIsRoleFormOpen(true);
+  };
+
+  const handleEditRole = (role: Role) => {
+    setEditingRole(role);
+    setIsRoleFormOpen(true);
+  };
+
+  const handleRoleFormSubmit = async (values: RoleFormValues) => {
+    try {
+      if (editingRole) {
+        const roleRef = doc(db, "roles", editingRole.id);
+        await updateDoc(roleRef, {
+          ...values,
+          updatedAt: serverTimestamp(),
+        });
+        toast({ title: "Success", description: "Role updated successfully." });
+      } else {
+        await addDoc(collection(db, "roles"), {
+          ...values,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        toast({ title: "Success", description: "Role created successfully." });
+      }
+      setIsRoleFormOpen(false);
+      setEditingRole(null);
+      fetchRoles();
+    } catch (err) {
+      console.error("Error saving role:", err);
+      toast({ title: "Error", description: `Failed to save role. ${err instanceof Error ? err.message : ''}`, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteRole = async (roleId: string, roleName: string) => {
+    // Basic check: prevent deleting a role if users are assigned to it.
+    // More robust checks might be needed (e.g., cannot delete default 'Admin' role).
+    const usersWithRole = users.filter(user => user.role === roleName); // This assumes role name is unique identifier.
+    if (usersWithRole.length > 0) {
+        toast({ title: "Cannot Delete Role", description: `Role "${roleName}" is currently assigned to ${usersWithRole.length} user(s). Reassign users before deleting.`, variant: "destructive"});
+        return;
+    }
+    if (roleName === 'Admin' || roleName === 'Editor' || roleName === 'Viewer') {
+        toast({ title: "Cannot Delete Role", description: `Cannot delete default role "${roleName}".`, variant: "destructive"});
+        return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "roles", roleId));
+      toast({ title: "Success", description: `Role "${roleName}" removed successfully.` });
+      fetchRoles();
+    } catch (err) {
+      console.error("Error removing role:", err);
+      toast({ title: "Error", description: `Failed to remove role. ${err instanceof Error ? err.message : ''}`, variant: "destructive" });
+    }
+  };
+
 
   return (
     <div className="space-y-6">
@@ -171,7 +242,7 @@ export default function AccessControlPage() {
         actions={
           <>
             <Button variant="outline" onClick={handleInviteNewUser}> <UserPlus className="mr-2 h-4 w-4" /> Invite New User</Button>
-            <Button disabled> <PlusCircle className="mr-2 h-4 w-4" /> Create New Role</Button> {/* Role creation deferred */}
+            <Button onClick={handleCreateNewRole}> <PlusCircle className="mr-2 h-4 w-4" /> Create New Role</Button>
           </>
         }
       />
@@ -223,7 +294,6 @@ export default function AccessControlPage() {
                                 <DropdownMenuLabel>Actions for {user.name}</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => handleEditUser(user)}><Edit2 className="mr-2 h-4 w-4" /> Edit User / Role</DropdownMenuItem>
-                                {/* <DropdownMenuItem onClick={() => handleEditUser(user)}><KeyRound className="mr-2 h-4 w-4" /> Change Role</DropdownMenuItem> */}
                                 <DropdownMenuSeparator />
                                  <AlertDialog>
                                     <AlertDialogTrigger asChild>
@@ -260,7 +330,7 @@ export default function AccessControlPage() {
         <Card>
             <CardHeader>
             <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" /> Roles & Permissions</CardTitle>
-            <CardDescription>Define roles and assign permissions to them. (Role management coming soon)</CardDescription>
+            <CardDescription>Define roles and assign permissions to them.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 {loadingRoles && (
@@ -271,30 +341,68 @@ export default function AccessControlPage() {
                 )}
                 {errorRoles && <p className="p-4 text-center text-destructive">{errorRoles}</p>}
                 {!loadingRoles && !errorRoles && roles.length === 0 && (
-                     <p className="p-4 text-center text-muted-foreground">No roles defined yet.</p>
+                     <p className="p-4 text-center text-muted-foreground">No roles defined yet. Click "Create New Role" to add one.</p>
                 )}
                 {!loadingRoles && !errorRoles && roles.map(role => (
                     <Card key={role.id} className="bg-muted/30">
                         <CardHeader className="pb-2">
-                            <div className="flex justify-between items-center">
-                                <CardTitle className="text-lg">{role.name}</CardTitle>
-                                <Button variant="outline" size="sm" disabled><Edit2 className="mr-1 h-3 w-3" /> Edit Role</Button>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <CardTitle className="text-lg">{role.name}</CardTitle>
+                                    <CardDescription className="text-xs">{role.description}</CardDescription>
+                                </div>
+                                <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Actions for {role.name}</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => handleEditRole(role)}><Edit2 className="mr-2 h-4 w-4" /> Edit Role</DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                         disabled={role.name === 'Admin' || role.name === 'Editor' || role.name === 'Viewer'} // Prevent deleting default roles
+                                        >
+                                            <Trash2 className="mr-2 h-4 w-4" /> Delete Role
+                                        </DropdownMenuItem>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                            This action cannot be undone. This will permanently remove the role "{role.name}".
+                                            Ensure no users are assigned this role before deleting.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteRole(role.id, role.name)} className="bg-destructive hover:bg-destructive/90">
+                                            Delete
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
-                            <CardDescription className="text-xs">{role.description}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Label className="text-sm font-medium">Permissions:</Label>
                             <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                                 {allPermissions.map(perm => (
                                     <div key={perm.id} className="flex items-center space-x-2">
-                                        <Checkbox 
-                                            id={`${role.id}-${perm.id}`} 
+                                        <Checkbox
+                                            id={`${role.id}-${perm.id}`}
                                             checked={role.permissions.includes(perm.id)}
-                                            disabled // Role editing is deferred
+                                            disabled // Display only, editing happens in RoleForm
+                                            className="cursor-default"
                                         />
-                                        <Label htmlFor={`${role.id}-${perm.id}`} className="text-xs font-normal cursor-not-allowed">{perm.label}</Label>
+                                        <Label htmlFor={`${role.id}-${perm.id}`} className="text-xs font-normal cursor-default">{perm.label}</Label>
                                     </div>
                                 ))}
+                                {role.permissions.length === 0 && <p className="text-xs text-muted-foreground col-span-full">No permissions assigned.</p>}
                             </div>
                         </CardContent>
                     </Card>
@@ -325,8 +433,29 @@ export default function AccessControlPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={isRoleFormOpen} onOpenChange={(isOpen) => {
+          setIsRoleFormOpen(isOpen);
+          if (!isOpen) setEditingRole(null);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingRole ? "Edit Role" : "Create New Role"}</DialogTitle>
+            <DialogDescription>
+              {editingRole ? "Make changes to the role details and permissions here." : "Define the new role and its permissions."} Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          <RoleForm
+            onSubmit={handleRoleFormSubmit}
+            initialData={editingRole}
+            allPermissions={allPermissions}
+            onCancel={() => {
+              setIsRoleFormOpen(false);
+              setEditingRole(null);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
-
-    

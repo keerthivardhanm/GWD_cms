@@ -34,21 +34,21 @@ interface BasePage {
   title: string;
   slug: string;
   status: PageStatus;
-  lastModified: string; 
+  lastModified: string;
   author: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
-  pageType: PageType; 
+  pageType: PageType;
 }
 
 // Define specific page types with their content
 export interface GenericPageData {
-  mainContent?: string; 
-  [key: string]: any; 
+  mainContent?: string;
+  [key: string]: any;
 }
 export interface GenericPage extends BasePage {
   pageType: 'generic';
-  content?: GenericPageData; 
+  content?: GenericPageData;
 }
 
 export interface HomePage extends BasePage {
@@ -72,32 +72,32 @@ export interface ContactPage extends BasePage {
 }
 
 export interface ProgramsListingPage extends BasePage {
-  pageType: 'programs'; 
+  pageType: 'programs';
   content: ProgramsListingPageContentType;
 }
 
 export interface IndividualProgramPage extends BasePage {
-  pageType: 'program-detail'; 
+  pageType: 'program-detail';
   content: IndividualProgramPageContentType;
 }
-export interface CentresOverviewPage extends BasePage { 
-  pageType: 'centres'; 
-  content: CentresOverviewPageContentType; 
+export interface CentresOverviewPage extends BasePage {
+  pageType: 'centres';
+  content: CentresOverviewPageContentType;
 }
-export interface IndividualCentrePage extends BasePage { 
-  pageType: 'centre-detail'; 
-  content: IndividualCentrePageContentType; 
+export interface IndividualCentrePage extends BasePage {
+  pageType: 'centre-detail';
+  content: IndividualCentrePageContentType;
 }
-export interface EnquiryPage extends BasePage { 
-  pageType: 'enquiry'; 
-  content: EnquiryPageContentType; 
+export interface EnquiryPage extends BasePage {
+  pageType: 'enquiry';
+  content: EnquiryPageContentType;
 }
 
 
 // Union type for all possible page structures
-export type Page = 
-  | GenericPage 
-  | HomePage 
+export type Page =
+  | GenericPage
+  | HomePage
   | AboutUsPage
   | AdmissionsPage
   | ContactPage
@@ -113,7 +113,7 @@ export default function PagesManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { user, userData } = useAuth(); 
+  const { user, userData } = useAuth();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPage, setEditingPage] = useState<Page | null>(null);
@@ -124,14 +124,14 @@ export default function PagesManagementPage() {
     setLoading(true);
     setError(null);
     try {
-      const pagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc")); 
+      const pagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc"));
       const querySnapshot = await getDocs(pagesQuery);
       const pagesData = querySnapshot.docs.map((docSnap: QueryDocumentSnapshot<DocumentData>) => {
         const data = docSnap.data();
-        let lastModifiedStr = data.updatedAt instanceof Timestamp 
-                              ? data.updatedAt.toDate().toLocaleDateString() 
+        let lastModifiedStr = data.updatedAt instanceof Timestamp
+                              ? data.updatedAt.toDate().toLocaleDateString()
                               : (data.createdAt instanceof Timestamp ? data.createdAt.toDate().toLocaleDateString() : new Date().toLocaleDateString());
-        
+
         const baseData = {
           id: docSnap.id,
           title: data.title || '',
@@ -142,9 +142,9 @@ export default function PagesManagementPage() {
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
           pageType: data.pageType || 'generic',
-          content: data.content || {}, 
+          content: data.content || {},
         };
-        
+
         switch (baseData.pageType) {
           case 'home':
             return { ...baseData, content: data.content || {} } as HomePage;
@@ -187,16 +187,12 @@ export default function PagesManagementPage() {
   }, [fetchPages]);
 
   const handleCreateNewPage = () => {
-    if (!isAdmin) {
-      toast({ title: "Permission Denied", description: "You do not have permission to create pages.", variant: "destructive" });
-      return;
-    }
     setEditingPage(null);
     setIsFormOpen(true);
   };
 
   const handleEditPage = (page: Page) => {
-     if (!isAdmin) {
+     if (!isAdmin) { // Keep edit restricted to admin
       toast({ title: "Permission Denied", description: "You do not have permission to edit pages.", variant: "destructive" });
       return;
     }
@@ -205,24 +201,24 @@ export default function PagesManagementPage() {
   };
 
   const handleFormSubmit = async (values: PageFormValues, pageType: PageType, contentData?: any) => {
-    if (!isAdmin) {
-      toast({ title: "Permission Denied", description: "You do not have permission to save pages.", variant: "destructive" });
-      return;
-    }
     try {
       const dataToSave: any = {
-        ...values, 
-        content: contentData || {}, 
+        ...values,
+        content: contentData || {},
         updatedAt: serverTimestamp(),
-        author: userData?.name || user?.email || 'System', 
+        author: userData?.name || user?.email || 'System',
       };
 
       if (editingPage) {
+        if (!isAdmin) { // Keep edit restricted to admin
+          toast({ title: "Permission Denied", description: "You do not have permission to update pages.", variant: "destructive" });
+          return;
+        }
         const pageRef = doc(db, "pages", editingPage.id);
         if (editingPage.createdAt) {
-          dataToSave.createdAt = editingPage.createdAt; 
+          dataToSave.createdAt = editingPage.createdAt;
         } else {
-          dataToSave.createdAt = serverTimestamp(); 
+          dataToSave.createdAt = serverTimestamp();
         }
         await updateDoc(pageRef, dataToSave);
         toast({
@@ -230,6 +226,7 @@ export default function PagesManagementPage() {
           description: "Page updated successfully.",
         });
       } else {
+        // Any authenticated user can create a page
         dataToSave.createdAt = serverTimestamp();
         await addDoc(collection(db, "pages"), dataToSave);
         toast({
@@ -239,7 +236,7 @@ export default function PagesManagementPage() {
       }
       setIsFormOpen(false);
       setEditingPage(null);
-      fetchPages(); 
+      fetchPages();
     } catch (err) {
       console.error("Error saving page:", err);
       toast({
@@ -251,7 +248,7 @@ export default function PagesManagementPage() {
   };
 
   const handleDeletePage = async (pageId: string) => {
-    if (!isAdmin) {
+    if (!isAdmin) { // Keep delete restricted to admin
       toast({ title: "Permission Denied", description: "You do not have permission to delete pages.", variant: "destructive" });
       return;
     }
@@ -261,7 +258,7 @@ export default function PagesManagementPage() {
         title: "Success",
         description: "Page deleted successfully.",
       });
-      fetchPages(); 
+      fetchPages();
     } catch (err) {
       console.error("Error deleting page:", err);
       toast({
@@ -271,12 +268,9 @@ export default function PagesManagementPage() {
       });
     }
   };
-  
+
   const NoPagesMessage = () => {
-    if (isAdmin) {
-      return "No pages found. Click \"Create New Page\" to get started.";
-    }
-    return "No pages found. Contact an administrator to add pages.";
+    return "No pages found. Click \"Create New Page\" to get started.";
   };
 
   return (
@@ -290,11 +284,10 @@ export default function PagesManagementPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input type="search" placeholder="Search pages..." className="pl-8 sm:w-[300px]" />
             </div>
-            {isAdmin && (
-              <Button onClick={handleCreateNewPage}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Create New Page
-              </Button>
-            )}
+            {/* Create New Page button always visible for authenticated users */}
+            <Button onClick={handleCreateNewPage}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Create New Page
+            </Button>
           </div>
         }
       />
@@ -345,7 +338,7 @@ export default function PagesManagementPage() {
                       <Button variant="ghost" size="sm" className="mr-2" onClick={() => alert('Preview not implemented yet. Intended public URL: /' + (page.pageType === 'home' ? '' : page.slug))}>
                         <Eye className="h-4 w-4 mr-1" /> Preview
                       </Button>
-                      {isAdmin && (
+                      {isAdmin && ( // Edit and Delete actions remain admin-only
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">
