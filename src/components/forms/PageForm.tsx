@@ -10,20 +10,24 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { Page, HomePage, AboutUsPage, AdmissionsPage, ContactPage, ProgramsListingPage, IndividualProgramPage } from '@/app/(app)/pages/page'; // Import Page types
+import type { Page, HomePage, AboutUsPage, AdmissionsPage, ContactPage, ProgramsListingPage, IndividualProgramPage, CentresOverviewPage, IndividualCentrePage, EnquiryPage } from '@/app/(app)/pages/page'; // Import Page types
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
+
 import { HomePageContentSchema, HomePageContentType } from '@/schemas/pages/homePageSchema';
 import { AboutUsPageContentSchema, AboutUsPageContentType } from '@/schemas/pages/aboutUsPageSchema';
 import { AdmissionsPageContentSchema, AdmissionsPageContentType } from '@/schemas/pages/admissionsPageSchema';
 import { ContactPageContentSchema, ContactPageContentType } from '@/schemas/pages/contactPageSchema';
 import { ProgramsListingPageContentSchema, ProgramsListingPageContentType } from '@/schemas/pages/programsListingPageSchema';
 import { IndividualProgramPageContentSchema, IndividualProgramPageContentType } from '@/schemas/pages/individualProgramPageSchema';
+import { CentresOverviewPageContentSchema, CentresOverviewPageContentType } from '@/schemas/pages/centresOverviewPageSchema';
+import { IndividualCentrePageContentSchema, IndividualCentrePageContentType } from '@/schemas/pages/individualCentrePageSchema';
+import { EnquiryPageContentSchema, EnquiryPageContentType } from '@/schemas/pages/enquiryPageSchema';
 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, Trash2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const pageStatuses = ["Draft", "Published", "Review"] as const;
 export type PageStatus = typeof pageStatuses[number];
@@ -33,17 +37,16 @@ export const pageTypes = [
     "home", 
     "about-us", 
     "admissions", 
-    "programs", // Programs Listing
-    "program-detail", // Individual Program
-    "centres", // Centres Overview
-    "centre-detail", // Individual Centre
+    "programs", 
+    "program-detail", 
+    "centres", 
+    "centre-detail", 
     "contact", 
     "enquiry"
 ] as const;
 export type PageType = typeof pageTypes[number];
 
 
-// Base schema for common page fields
 const basePageFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(100, "Title must be 100 characters or less"),
   slug: z.string().min(1, "Slug is required").regex(/^[a-z0-9]+(?:-[a-z0-9/-]+)*$/, "Slug must be lowercase alphanumeric with hyphens/slashes"),
@@ -52,9 +55,8 @@ const basePageFormSchema = z.object({
   pageType: z.enum(pageTypes).default('generic'),
 });
 
-// Placeholder for dynamic content validation - specific fields will be added based on pageType
 const pageFormValidationSchema = basePageFormSchema.extend({
-  content: z.any().optional(), // General placeholder, specific schemas will be used for parsing
+  content: z.any().optional(), 
 });
 
 
@@ -81,7 +83,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
   const [currentContentType, setCurrentContentType] = useState<PageType>(initialData?.pageType || 'generic');
 
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch, setError, clearErrors, reset, getValues } = useForm<z.infer<typeof pageFormValidationSchema>>({
-    resolver: zodResolver(pageFormValidationSchema), // Use the extended schema for validation structure
+    resolver: zodResolver(pageFormValidationSchema),
     defaultValues: {
       title: initialData?.title || '',
       slug: initialData?.slug || '',
@@ -99,7 +101,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
   const [isCheckingSlug, setIsCheckingSlug] = useState(false);
   const [slugError, setSlugCustomError] = useState<string | null>(null);
 
-  // Home Page Arrays
+  // Field Array Hooks
   const { fields: heroSlidesFields, append: appendHeroSlide, remove: removeHeroSlide } = useFieldArray({ control, name: "content.heroSection.slides" });
   const { fields: whyChooseFeaturesFields, append: appendWhyChooseFeature, remove: removeWhyChooseFeature } = useFieldArray({ control, name: "content.whyChoose.features" });
   const { fields: homeProgramsFields, append: appendHomeProgram, remove: removeHomeProgram } = useFieldArray({ control, name: "content.programsList.programs" });
@@ -108,19 +110,15 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
   const { fields: accreditationsFields, append: appendAccreditation, remove: removeAccreditation } = useFieldArray({ control, name: "content.accreditations.logos" });
   const { fields: globalPartnershipsFields, append: appendGlobalPartnership, remove: removeGlobalPartnership } = useFieldArray({ control, name: "content.globalPartnerships.partners" });
   
-  // Admissions Page Arrays
   const { fields: applicationStepsFields, append: appendApplicationStep, remove: removeApplicationStep } = useFieldArray({ control, name: "content.applicationSteps.steps" });
   const { fields: admissionsFaqsFields, append: appendAdmissionsFaq, remove: removeAdmissionsFaq } = useFieldArray({ control, name: "content.admissionsFaq.faqs" });
 
-  // About Us Page Arrays
   const { fields: missionPointsFields, append: appendMissionPoint, remove: removeMissionPoint } = useFieldArray({ control, name: "content.visionMission.missionPoints" });
   const { fields: timelineEventsFields, append: appendTimelineEvent, remove: removeTimelineEvent } = useFieldArray({ control, name: "content.timelineSection.events" });
 
-  // Programs Listing Page Arrays
   const { fields: programTabsFields, append: appendProgramTab, remove: removeProgramTab } = useFieldArray({ control, name: "content.programTabs.tabs" });
   const { fields: programCardsFields, append: appendProgramCard, remove: removeProgramCard } = useFieldArray({ control, name: "content.programCards.programs" });
   
-  // Individual Program Page Arrays
   const { fields: programHighlightsFields, append: appendProgramHighlight, remove: removeProgramHighlight } = useFieldArray({ control, name: "content.overviewSection.highlights" });
   const { fields: programYear1SubjectsFields, append: appendProgramYear1Subject, remove: removeProgramYear1Subject } = useFieldArray({ control, name: "content.curriculumSection.yearWiseSubjects.year1" });
   const { fields: programYear2SubjectsFields, append: appendProgramYear2Subject, remove: removeProgramYear2Subject } = useFieldArray({ control, name: "content.curriculumSection.yearWiseSubjects.year2" });
@@ -128,13 +126,10 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
   const { fields: careerOpportunitiesFields, append: appendCareerOpportunity, remove: removeCareerOpportunity } = useFieldArray({ control, name: "content.careerOpportunities.careers" });
   const { fields: programFaqsFields, append: appendProgramFaq, remove: removeProgramFaq } = useFieldArray({ control, name: "content.programFaqs.faqs" });
 
-  // Centres Overview Page Arrays
   const { fields: centreCardsFields, append: appendCentreCard, remove: removeCentreCard } = useFieldArray({ control, name: "content.centreCards.centres" });
-
-  // Individual Centre Page Arrays
+  
   const { fields: centreFeaturesFields, append: appendCentreFeature, remove: removeCentreFeature } = useFieldArray({ control, name: "content.centreInfo.features" });
   
-  // Enquiry Page Arrays
   const { fields: enquiryFormFields, append: appendEnquiryFormField, remove: removeEnquiryFormField } = useFieldArray({ control, name: "content.enquiryForm.fields" });
 
 
@@ -164,7 +159,15 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
         case 'program-detail':
              newContentDefaults = initialData?.pageType === 'program-detail' ? (initialData as IndividualProgramPage).content : IndividualProgramPageContentSchema.parse({});
              break;
-        // Add cases for other page types and their default schemas
+        case 'centres':
+             newContentDefaults = initialData?.pageType === 'centres' ? (initialData as CentresOverviewPage).content : CentresOverviewPageContentSchema.parse({});
+             break;
+        case 'centre-detail':
+             newContentDefaults = initialData?.pageType === 'centre-detail' ? (initialData as IndividualCentrePage).content : IndividualCentrePageContentSchema.parse({});
+             break;
+        case 'enquiry':
+             newContentDefaults = initialData?.pageType === 'enquiry' ? (initialData as EnquiryPage).content : EnquiryPageContentSchema.parse({});
+             break;
         default:
             newContentDefaults = initialData?.pageType === 'generic' ? initialData.content : {};
             break;
@@ -183,7 +186,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
 
 
   useEffect(() => {
-    if (watchedTitle && !initialData?.slug && !initialData?.title && !getValues("slug")) { // Only set slug if it's not already set by user or initialData
+    if (watchedTitle && !initialData?.slug && !initialData?.title && !getValues("slug")) {
       setValue("slug", generateSlug(watchedTitle), { shouldValidate: true });
     }
   }, [watchedTitle, setValue, initialData, getValues]);
@@ -268,9 +271,17 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
             case 'program-detail':
                 pageContent = IndividualProgramPageContentSchema.parse(contentFromForm);
                 break;
-            // Add cases for other page types to parse their specific content
-            default: // 'generic' or other types not yet specifically handled
-                pageContent = contentFromForm; // Pass through for generic or unparsed types
+            case 'centres':
+                pageContent = CentresOverviewPageContentSchema.parse(contentFromForm);
+                break;
+            case 'centre-detail':
+                pageContent = IndividualCentrePageContentSchema.parse(contentFromForm);
+                break;
+            case 'enquiry':
+                pageContent = EnquiryPageContentSchema.parse(contentFromForm);
+                break;
+            default: 
+                pageContent = contentFromForm; 
                 break;
         }
     } catch (e) {
@@ -281,9 +292,9 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                 description: `There are issues with the content for page type "${data.pageType}". Check console for details.`,
                 variant: "destructive"
             });
-            return; // Stop submission if content parsing fails
+            return; 
         }
-        throw e; // Re-throw other errors
+        throw e; 
     }
     onSubmit(baseValues, data.pageType, pageContent);
   };
@@ -412,25 +423,22 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
         {/* Content fields based on pageType */}
         {currentContentType === 'home' && (
           <Card className="border-t pt-4 mt-4">
-            <CardHeader><CardTitle className="text-lg">Home Page Content</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-lg">Home Page Content</CardTitle><CardDescription>Manage content for the Home page.</CardDescription></CardHeader>
             <CardContent>
-              {/* Hero Section */}
               {renderFieldArray(
                 heroSlidesFields, removeHeroSlide, appendHeroSlide, "content.heroSection.slides",
                 { 
+                  imgSrc: { label: "Image URL", type: 'input', placeholder: "https://placehold.co/1920x1080.png" },
+                  alt: { label: "Image Alt Text", type: 'input', placeholder: "Descriptive alt text" },
                   heading: { label: "Heading", type: 'input', placeholder: "Hero slide heading" },
                   paragraph: { label: "Paragraph", type: 'textarea', placeholder: "Hero slide paragraph" },
-                  imgSrc: { label: "Image URL", type: 'input', placeholder: "https://example.com/image.jpg" },
-                  alt: { label: "Image Alt Text", type: 'input', placeholder: "Image alt text" },
                   btnText: { label: "Button Text", type: 'input', placeholder: "Learn More" },
                   btnLink: { label: "Button Link", type: 'input', placeholder: "/about-us" },
                 },
-                { heading: '', paragraph: '', imgSrc: '', alt: '', btnText: '', btnLink: '' },
-                "Hero Slides"
+                HomePageContentSchema.shape.heroSection.shape.slides.element.parse({}), "Hero Slides"
               )}
-              {/* Why Choose Section */}
               <Card className="my-4"><CardHeader><CardTitle className="text-md">Why Choose Apollo</CardTitle></CardHeader>
-                <CardContent>
+                <CardContent className="space-y-2">
                   <div><Label htmlFor="content.whyChoose.introHeading">Intro Heading</Label><Input {...register("content.whyChoose.introHeading")} placeholder="Why Choose Us?" /></div>
                   <div><Label htmlFor="content.whyChoose.introParagraph">Intro Paragraph</Label><Textarea {...register("content.whyChoose.introParagraph")} placeholder="Detailed description..." /></div>
                   {renderFieldArray(
@@ -440,14 +448,12 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                       title: { label: "Feature Title", type: 'input' },
                       description: { label: "Feature Description", type: 'textarea' },
                     },
-                    { iconSrc: '', title: '', description: '' },
-                    "Features"
+                    HomePageContentSchema.shape.whyChoose.shape.features.element.parse({}), "Features"
                   )}
                 </CardContent>
               </Card>
-              {/* Programs Section */}
               <Card className="my-4"><CardHeader><CardTitle className="text-md">Programs List Section</CardTitle></CardHeader>
-                <CardContent>
+                <CardContent className="space-y-2">
                     <div><Label htmlFor="content.programsList.sectionHeading">Section Heading</Label><Input {...register("content.programsList.sectionHeading")} /></div>
                     <div><Label htmlFor="content.programsList.sectionIntro">Section Intro</Label><Textarea {...register("content.programsList.sectionIntro")} /></div>
                     {renderFieldArray(
@@ -457,19 +463,17 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                             title: { label: "Program Title", type: 'input' }, description: { label: "Program Description", type: 'textarea' },
                             btnLink: { label: "Button Link", type: 'input' }
                         },
-                        { imgSrc: '', alt: '', title: '', description: '', btnLink: '' }, "Programs"
+                        HomePageContentSchema.shape.programsList.shape.programs.element.parse({}), "Programs"
                     )}
                 </CardContent>
               </Card>
-              {/* Counters */}
                {renderFieldArray(
                     countersFields, removeCounter, appendCounter, "content.counters.counters",
                     { value: { label: "Counter Value", type: 'input' }, label: { label: "Counter Label", type: 'input' }},
-                    { value: '', label: '' }, "Counters"
+                    HomePageContentSchema.shape.counters.shape.counters.element.parse({}), "Counters"
                 )}
-              {/* Centres Section */}
               <Card className="my-4"><CardHeader><CardTitle className="text-md">Centres Section</CardTitle></CardHeader>
-                <CardContent>
+                <CardContent className="space-y-2">
                     <div><Label htmlFor="content.centres.sectionHeading">Section Heading</Label><Input {...register("content.centres.sectionHeading")} /></div>
                     {renderFieldArray(
                         homeCentresFields, removeHomeCentre, appendHomeCentre, "content.centres.centres",
@@ -478,28 +482,29 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                             name: { label: "Centre Name", type: 'input' }, description: { label: "Centre Description", type: 'textarea' },
                             btnLink: { label: "Button Link", type: 'input' }
                         },
-                        { imgSrc: '', alt: '', name: '', description: '', btnLink: '' }, "Centres"
+                        HomePageContentSchema.shape.centres.shape.centres.element.parse({}), "Centres"
                     )}
                 </CardContent>
               </Card>
-              {/* Accreditations */}
-              {renderFieldArray(
-                  accreditationsFields, removeAccreditation, appendAccreditation, "content.accreditations.logos",
-                  { imgSrc: { label: "Logo Image URL", type: 'input' }, alt: { label: "Logo Alt", type: 'input' }, name: { label: "Accreditation Name", type: 'input' }},
-                  { imgSrc: '', alt: '', name: '' }, "Accreditation Logos"
-              )}
-              {/* Global Partnerships */}
-              <Card className="my-4"><CardHeader><CardTitle className="text-md">Global Partnerships Section</CardTitle></CardHeader>
+              <Card className="my-4"><CardHeader><CardTitle className="text-md">Accreditations</CardTitle></CardHeader>
                 <CardContent>
+                  {renderFieldArray(
+                      accreditationsFields, removeAccreditation, appendAccreditation, "content.accreditations.logos",
+                      { imgSrc: { label: "Logo Image URL", type: 'input' }, alt: { label: "Logo Alt", type: 'input' }, name: { label: "Accreditation Name", type: 'input' }},
+                      HomePageContentSchema.shape.accreditations.shape.logos.element.parse({}), "Accreditation Logos"
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="my-4"><CardHeader><CardTitle className="text-md">Global Partnerships Section</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
                     <div><Label htmlFor="content.globalPartnerships.sectionHeading">Section Heading</Label><Input {...register("content.globalPartnerships.sectionHeading")} /></div>
                     {renderFieldArray(
                         globalPartnershipsFields, removeGlobalPartnership, appendGlobalPartnership, "content.globalPartnerships.partners",
                         { imgSrc: { label: "Partner Logo URL", type: 'input' }, alt: { label: "Partner Alt", type: 'input' }, name: { label: "Partner Name", type: 'input' }},
-                        { imgSrc: '', alt: '', name: '' }, "Partners"
+                        HomePageContentSchema.shape.globalPartnerships.shape.partners.element.parse({}), "Partners"
                     )}
                 </CardContent>
               </Card>
-              {/* Enquire CTA */}
               <Card className="my-4"><CardHeader><CardTitle className="text-md">Enquire CTA Section</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
                     <div><Label htmlFor="content.ctaSection.heading">Heading</Label><Input {...register("content.ctaSection.heading")} /></div>
@@ -513,11 +518,10 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
 
         {currentContentType === 'admissions' && (
           <Card className="border-t pt-4 mt-4">
-            <CardHeader><CardTitle className="text-lg">Admissions Page Content</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-lg">Admissions Page Content</CardTitle><CardDescription>Manage content for the Admissions page.</CardDescription></CardHeader>
             <CardContent>
-              {/* Application Steps */}
               <Card className="my-4"><CardHeader><CardTitle className="text-md">Application Steps</CardTitle></CardHeader>
-                <CardContent>
+                <CardContent className="space-y-2">
                   <div><Label htmlFor="content.applicationSteps.mainHeading">Main Heading</Label><Input {...register("content.applicationSteps.mainHeading")} /></div>
                   {renderFieldArray(
                     applicationStepsFields, removeApplicationStep, appendApplicationStep, "content.applicationSteps.steps",
@@ -526,14 +530,12 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                       title: { label: "Step Title", type: 'input' },
                       description: { label: "Step Description", type: 'textarea' },
                     },
-                    { number: '', title: '', description: '' },
-                    "Steps"
+                    AdmissionsPageContentSchema.shape.applicationSteps.shape.steps.element.parse({}), "Steps"
                   )}
                 </CardContent>
               </Card>
-              {/* FAQ Section */}
               <Card className="my-4"><CardHeader><CardTitle className="text-md">FAQ Section</CardTitle></CardHeader>
-                <CardContent>
+                <CardContent className="space-y-2">
                   <div><Label htmlFor="content.admissionsFaq.sectionHeading">Section Heading</Label><Input {...register("content.admissionsFaq.sectionHeading")} /></div>
                   {renderFieldArray(
                     admissionsFaqsFields, removeAdmissionsFaq, appendAdmissionsFaq, "content.admissionsFaq.faqs",
@@ -541,12 +543,10 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                       question: { label: "Question", type: 'input' },
                       answer: { label: "Answer", type: 'textarea' },
                     },
-                    { question: '', answer: '' },
-                    "FAQs"
+                    AdmissionsPageContentSchema.shape.admissionsFaq.shape.faqs.element.parse({}), "FAQs"
                   )}
                 </CardContent>
               </Card>
-              {/* Eligibility & Info CTA */}
               <Card className="my-4"><CardHeader><CardTitle className="text-md">Eligibility & Info CTA</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
                   <div><Label htmlFor="content.eligibilitySection.eligibilityCriteria">Eligibility Criteria</Label><Textarea {...register("content.eligibilitySection.eligibilityCriteria")} /></div>
@@ -562,9 +562,8 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
 
         {currentContentType === 'about-us' && (
           <Card className="border-t pt-4 mt-4">
-            <CardHeader><CardTitle className="text-lg">About Us Page Content</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-lg">About Us Page Content</CardTitle><CardDescription>Manage content for the About Us page.</CardDescription></CardHeader>
             <CardContent>
-                {/* Banner */}
                 <Card className="my-4"><CardHeader><CardTitle className="text-md">Banner</CardTitle></CardHeader>
                     <CardContent className="space-y-2">
                         <div><Label htmlFor="content.banner.heading">Heading</Label><Input {...register("content.banner.heading")} /></div>
@@ -572,25 +571,22 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                         <div><Label htmlFor="content.banner.backgroundImage">Background Image URL</Label><Input {...register("content.banner.backgroundImage")} /></div>
                     </CardContent>
                 </Card>
-                {/* Vision & Mission */}
                 <Card className="my-4"><CardHeader><CardTitle className="text-md">Vision & Mission</CardTitle></CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-2">
                         <div><Label htmlFor="content.visionMission.visionText">Vision Text</Label><Textarea {...register("content.visionMission.visionText")} /></div>
                         {renderFieldArray(
                             missionPointsFields, removeMissionPoint, appendMissionPoint, "content.visionMission.missionPoints",
-                            { point: { label: "Mission Point", type: 'input' } }, // Simple array of strings, so one field per item
-                            "", // Append an empty string
-                            "Mission Points"
+                            { point: { label: "Mission Point", type: 'input' } }, 
+                            "", "Mission Points"
                         )}
                     </CardContent>
                 </Card>
-                {/* Timeline / History */}
                  <Card className="my-4"><CardHeader><CardTitle className="text-md">Timeline / History</CardTitle></CardHeader>
                     <CardContent>
                         {renderFieldArray(
                             timelineEventsFields, removeTimelineEvent, appendTimelineEvent, "content.timelineSection.events",
                             { year: { label: "Year", type: 'input' }, event: { label: "Event Description", type: 'textarea' }},
-                            { year: '', event: '' }, "Timeline Events"
+                            AboutUsPageContentSchema.shape.timelineSection.shape.events.element.parse({}), "Timeline Events"
                         )}
                     </CardContent>
                 </Card>
@@ -600,15 +596,13 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
 
         {currentContentType === 'programs' && (
            <Card className="border-t pt-4 mt-4">
-            <CardHeader><CardTitle className="text-lg">Programs Listing Page Content</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-lg">Programs Listing Page Content</CardTitle><CardDescription>Manage content for the Programs Listing page.</CardDescription></CardHeader>
             <CardContent>
-                {/* Program Categories (Tabs) */}
                 {renderFieldArray(
                     programTabsFields, removeProgramTab, appendProgramTab, "content.programTabs.tabs",
                     { title: { label: "Tab Title", type: 'input' }, anchorLink: { label: "Anchor Link (e.g. #category)", type: 'input' } },
-                    { title: '', anchorLink: '' }, "Program Categories (Tabs)"
+                    ProgramsListingPageContentSchema.shape.programTabs.shape.tabs.element.parse({}), "Program Categories (Tabs)"
                 )}
-                {/* Program Cards */}
                 {renderFieldArray(
                     programCardsFields, removeProgramCard, appendProgramCard, "content.programCards.programs",
                     {
@@ -616,7 +610,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                         alt: { label: "Image Alt", type: 'input' }, description: { label: "Description", type: 'textarea' },
                         duration: { label: "Duration", type: 'input' }, btnLink: { label: "Details Link", type: 'input' }
                     },
-                    { title: '', imgSrc: '', alt: '', description: '', duration: '', btnLink: '' }, "Program Cards"
+                    ProgramsListingPageContentSchema.shape.programCards.shape.programs.element.parse({}), "Program Cards"
                 )}
             </CardContent>
            </Card>
@@ -624,9 +618,8 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
 
         {currentContentType === 'program-detail' && (
             <Card className="border-t pt-4 mt-4">
-                <CardHeader><CardTitle className="text-lg">Individual Program Page Content</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-lg">Individual Program Page Content</CardTitle><CardDescription>Manage content for an Individual Program page.</CardDescription></CardHeader>
                 <CardContent>
-                    {/* Hero Section */}
                     <Card className="my-4"><CardHeader><CardTitle className="text-md">Hero Section</CardTitle></CardHeader>
                         <CardContent className="space-y-2">
                             <div><Label htmlFor="content.programHero.heading">Heading</Label><Input {...register("content.programHero.heading")} /></div>
@@ -636,17 +629,16 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                             <div><Label htmlFor="content.programHero.btnLink">Button Link</Label><Input {...register("content.programHero.btnLink")} /></div>
                         </CardContent>
                     </Card>
-                    {/* Overview Section */}
                     <Card className="my-4"><CardHeader><CardTitle className="text-md">Overview</CardTitle></CardHeader>
-                        <CardContent>
+                        <CardContent className="space-y-2">
                             <div><Label htmlFor="content.overviewSection.introText">Intro Text</Label><Textarea {...register("content.overviewSection.introText")} /></div>
                             {renderFieldArray(
                                 programHighlightsFields, removeProgramHighlight, appendProgramHighlight, "content.overviewSection.highlights",
-                                { highlight: {label: "Highlight", type: "input"} }, "", "Highlights" // Array of strings
+                                { highlight: {label: "Highlight", type: "input"} }, 
+                                "", "Highlights"
                             )}
                         </CardContent>
                     </Card>
-                    {/* Curriculum Section */}
                     <Card className="my-4"><CardHeader><CardTitle className="text-md">Curriculum</CardTitle></CardHeader>
                         <CardContent>
                              {renderFieldArray(programYear1SubjectsFields, removeProgramYear1Subject, appendProgramYear1Subject, "content.curriculumSection.yearWiseSubjects.year1", { subject: { label: "Subject", type: 'input'}}, "", "Year 1 Subjects")}
@@ -654,24 +646,34 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                              {renderFieldArray(programYear3SubjectsFields, removeProgramYear3Subject, appendProgramYear3Subject, "content.curriculumSection.yearWiseSubjects.year3", { subject: { label: "Subject", type: 'input'}}, "", "Year 3 Subjects")}
                         </CardContent>
                     </Card>
-                    {/* Eligibility & Duration */}
                     <Card className="my-4"><CardHeader><CardTitle className="text-md">Eligibility & Duration</CardTitle></CardHeader>
                         <CardContent className="space-y-2">
                             <div><Label htmlFor="content.eligibilityDuration.eligibility">Eligibility</Label><Textarea {...register("content.eligibilityDuration.eligibility")} /></div>
                             <div><Label htmlFor="content.eligibilityDuration.duration">Duration</Label><Input {...register("content.eligibilityDuration.duration")} /></div>
                         </CardContent>
                     </Card>
-                    {/* Career Opportunities */}
-                    {renderFieldArray(careerOpportunitiesFields, removeCareerOpportunity, appendCareerOpportunity, "content.careerOpportunities.careers", { career: { label: "Career Opportunity", type: 'input'}}, "", "Career Opportunities")}
-                    {/* Program FAQs */}
-                    {renderFieldArray(programFaqsFields, removeProgramFaq, appendProgramFaq, "content.programFaqs.faqs", { question: { label: "Question", type: 'input' }, answer: { label: "Answer", type: 'textarea'}}, {question: '', answer: ''}, "Program FAQs")}
+                     <Card className="my-4"><CardHeader><CardTitle className="text-md">Career Opportunities</CardTitle></CardHeader>
+                        <CardContent>
+                           {renderFieldArray(careerOpportunitiesFields, removeCareerOpportunity, appendCareerOpportunity, "content.careerOpportunities.careers", { career: { label: "Career Opportunity", type: 'input'}}, "", "Career Opportunities")}
+                        </CardContent>
+                    </Card>
+                     <Card className="my-4"><CardHeader><CardTitle className="text-md">Program FAQs</CardTitle></CardHeader>
+                        <CardContent>
+                            {renderFieldArray(
+                                programFaqsFields, removeProgramFaq, appendProgramFaq, "content.programFaqs.faqs", 
+                                { question: { label: "Question", type: 'input' }, answer: { label: "Answer", type: 'textarea'}}, 
+                                IndividualProgramPageContentSchema.shape.programFaqs.shape.faqs.element.parse({}), 
+                                "Program FAQs"
+                            )}
+                        </CardContent>
+                    </Card>
                 </CardContent>
             </Card>
         )}
         
         {currentContentType === 'centres' && (
             <Card className="border-t pt-4 mt-4">
-                <CardHeader><CardTitle className="text-lg">Centres Overview Page Content</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-lg">Centres Overview Page Content</CardTitle><CardDescription>Manage content for the Centres Overview page.</CardDescription></CardHeader>
                 <CardContent>
                     {renderFieldArray(
                         centreCardsFields, removeCentreCard, appendCentreCard, "content.centreCards.centres",
@@ -680,7 +682,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                             alt: {label: "Image Alt", type: 'input'}, description: {label: "Description", type: 'textarea'},
                             btnLink: {label: "Details Link", type: 'input'}
                         },
-                        {name: '', imgSrc: '', alt: '', description: '', btnLink: ''}, "Centre Cards"
+                        CentresOverviewPageContentSchema.shape.centreCards.shape.centres.element.parse({}), "Centre Cards"
                     )}
                 </CardContent>
             </Card>
@@ -688,7 +690,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
 
         {currentContentType === 'centre-detail' && (
             <Card className="border-t pt-4 mt-4">
-                <CardHeader><CardTitle className="text-lg">Individual Centre Page Content</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-lg">Individual Centre Page Content</CardTitle><CardDescription>Manage content for an Individual Centre page.</CardDescription></CardHeader>
                 <CardContent>
                     <Card className="my-4"><CardHeader><CardTitle className="text-md">Centre Info</CardTitle></CardHeader>
                         <CardContent className="space-y-2">
@@ -697,7 +699,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                             {renderFieldArray(
                                 centreFeaturesFields, removeCentreFeature, appendCentreFeature, "content.centreInfo.features",
                                 { icon: {label: "Icon (e.g. lucide:Home)", type: 'input'}, text: {label: "Feature Text", type: 'input'}},
-                                {icon: '', text: ''}, "Features"
+                                IndividualCentrePageContentSchema.shape.centreInfo.shape.features.element.parse({}), "Features"
                             )}
                         </CardContent>
                     </Card>
@@ -705,12 +707,10 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
             </Card>
         )}
 
-
         {currentContentType === 'contact' && (
           <Card className="border-t pt-4 mt-4">
-            <CardHeader><CardTitle className="text-lg">Contact Page Content</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-lg">Contact Page Content</CardTitle><CardDescription>Manage content for the Contact page.</CardDescription></CardHeader>
             <CardContent>
-                {/* Contact Form structure (placeholders for fields in the UI) */}
                 <Card className="my-4"><CardHeader><CardTitle className="text-md">Contact Form Fields (Labels)</CardTitle></CardHeader>
                     <CardContent className="space-y-2">
                         <div><Label htmlFor="content.contactForm.name">Name Field Label</Label><Input {...register("content.contactForm.name")} placeholder="e.g., Your Name" /></div>
@@ -720,7 +720,6 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                         <div><Label htmlFor="content.contactForm.submitButtonText">Submit Button Text</Label><Input {...register("content.contactForm.submitButtonText")} placeholder="e.g., Send Message" /></div>
                     </CardContent>
                 </Card>
-                {/* Contact Info Block */}
                 <Card className="my-4"><CardHeader><CardTitle className="text-md">Contact Info Block</CardTitle></CardHeader>
                     <CardContent className="space-y-2">
                         <div><Label htmlFor="content.contactInfo.phone">Phone Number</Label><Input {...register("content.contactInfo.phone")} /></div>
@@ -735,25 +734,31 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
 
         {currentContentType === 'enquiry' && (
              <Card className="border-t pt-4 mt-4">
-                <CardHeader><CardTitle className="text-lg">Enquiry Page Content</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-lg">Enquiry Page Content</CardTitle><CardDescription>Manage content for the Enquiry page.</CardDescription></CardHeader>
                 <CardContent>
+                    <Card className="my-4"><CardHeader><CardTitle className="text-md">Enquiry Form Settings</CardTitle></CardHeader>
+                      <CardContent className="space-y-2">
+                        <div><Label htmlFor="content.enquiryForm.formTitle">Form Title</Label><Input {...register("content.enquiryForm.formTitle")} /></div>
+                        <div><Label htmlFor="content.enquiryForm.submitButtonText">Submit Button Text</Label><Input {...register("content.enquiryForm.submitButtonText")} /></div>
+                      </CardContent>
+                    </Card>
                     {renderFieldArray(
                         enquiryFormFields, removeEnquiryFormField, appendEnquiryFormField, "content.enquiryForm.fields",
                         {
                             label: {label: "Field Label", type: 'input'}, name: {label: "Field Name (unique key)", type: 'input'},
                             inputType: {label: "Input Type", type: 'select', options: ['text', 'email', 'tel', 'textarea', 'select', 'checkbox', 'radio']},
-                            placeholder: {label: "Placeholder (optional)", type: 'input'}
+                            placeholder: {label: "Placeholder (optional)", type: 'input'},
+                            // required: {label: "Required", type: 'checkbox'} // Complex to implement with this helper, handle directly if needed
                         },
-                        {label: '', name: '', inputType: 'text', placeholder: ''}, "Enquiry Form Fields"
+                        EnquiryPageContentSchema.shape.enquiryForm.shape.fields.element.parse({}), "Enquiry Form Fields"
                     )}
                 </CardContent>
              </Card>
         )}
 
-
         {currentContentType === 'generic' && (
              <Card className="border-t pt-4 mt-4">
-                <CardHeader><CardTitle className="text-lg">Generic Page Content</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-lg">Generic Page Content</CardTitle><CardDescription>Manage generic content using Markdown or HTML.</CardDescription></CardHeader>
                 <CardContent>
                     <Label htmlFor="content.mainContent">Main Content (Markdown or HTML)</Label>
                     <Textarea id="content.mainContent" {...register("content.mainContent")} placeholder="Enter content for the generic page..." rows={10}/>
@@ -763,11 +768,11 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
         )}
 
 
-        <div className="flex justify-end gap-2 pt-4">
+        <div className="flex justify-end gap-2 pt-4 sticky bottom-0 bg-background pb-4">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting || isCheckingSlug}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || isCheckingSlug || !!slugError || !!errors.slug}>
+          <Button type="submit" disabled={isSubmitting || isCheckingSlug || !!slugError || !!Object.keys(errors).length}>
             {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Create Page')}
           </Button>
         </div>
@@ -775,5 +780,3 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
     </ScrollArea>
   );
 }
-
-    

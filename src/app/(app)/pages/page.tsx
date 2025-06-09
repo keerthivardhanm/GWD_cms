@@ -119,7 +119,6 @@ export default function PagesManagementPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPage, setEditingPage] = useState<Page | null>(null);
 
-  const isAdmin = userData?.role === 'Admin';
 
   const fetchPages = useCallback(async () => {
     setLoading(true);
@@ -193,10 +192,6 @@ export default function PagesManagementPage() {
   };
 
   const handleEditPage = (page: Page) => {
-     if (!isAdmin) { 
-      toast({ title: "Permission Denied", description: "You do not have permission to edit pages.", variant: "destructive" });
-      return;
-    }
     setEditingPage(page);
     setIsFormOpen(true);
   };
@@ -207,19 +202,15 @@ export default function PagesManagementPage() {
         ...values,
         content: contentData || {},
         updatedAt: serverTimestamp(),
-        author: userData?.name || user?.email || 'System', // Use current user as author
+        author: userData?.name || user?.email || 'System',
       };
 
       if (editingPage) {
-        if (!isAdmin) {
-          toast({ title: "Permission Denied", description: "You do not have permission to update pages.", variant: "destructive" });
-          return;
-        }
         const pageRef = doc(db, "pages", editingPage.id);
         if (editingPage.createdAt) {
           dataToSave.createdAt = editingPage.createdAt; 
         } else {
-           dataToSave.createdAt = serverTimestamp(); // Should ideally not happen for an edit
+           dataToSave.createdAt = serverTimestamp();
         }
         await updateDoc(pageRef, dataToSave);
         await logAuditEvent(user, userData, 'PAGE_UPDATED', 'Page', editingPage.id, values.title, { newValues: values, newContent: contentData });
@@ -250,12 +241,7 @@ export default function PagesManagementPage() {
   };
 
   const handleDeletePage = async (pageId: string) => {
-    if (!isAdmin) { 
-      toast({ title: "Permission Denied", description: "You do not have permission to delete pages.", variant: "destructive" });
-      return;
-    }
     try {
-      // Fetch page title for audit log before deleting
       const pageRef = doc(db, "pages", pageId);
       const pageSnap = await getDoc(pageRef);
       const pageTitle = pageSnap.exists() ? pageSnap.data().title : pageId;
@@ -292,10 +278,11 @@ export default function PagesManagementPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input type="search" placeholder="Search pages..." className="pl-8 sm:w-[300px]" />
             </div>
-            {/* Create New Page button always visible for authenticated users */}
-            <Button onClick={handleCreateNewPage}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Create New Page
-            </Button>
+            {user && ( // Show create button if user is logged in
+                <Button onClick={handleCreateNewPage}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Create New Page
+                </Button>
+            )}
           </div>
         }
       />
@@ -343,10 +330,10 @@ export default function PagesManagementPage() {
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">{page.lastModified}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" className="mr-2" onClick={() => alert('Preview not implemented yet. Intended public URL: /' + (page.pageType === 'home' ? '' : page.slug))}>
+                      <Button variant="outline" size="sm" className="mr-2" onClick={() => alert('Preview: Intended public URL: /' + (page.pageType === 'home' && !page.slug ? '' : page.slug))}>
                         <Eye className="h-4 w-4 mr-1" /> Preview
                       </Button>
-                      {isAdmin && ( 
+                      {user && ( 
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">
