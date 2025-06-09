@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -11,36 +11,68 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { User } from '@/app/(app)/access-control/page'; // Import User type
 
-// UserRole will now be dynamic based on roles fetched from DB, but we keep a base type for schema
 export type UserRole = string; 
 
-const userFormSchema = z.object({
+const baseUserSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
   email: z.string().email("Invalid email address").min(1, "Email is required"),
-  role: z.string().min(1, "Role is required"), // Roles are now strings
+  role: z.string().min(1, "Role is required"),
 });
 
-export type UserFormValues = z.infer<typeof userFormSchema>;
+const newUserSchema = baseUserSchema.extend({
+  password: z.string().min(6, "Password must be at least 6 characters long"),
+});
+
+const editUserSchema = baseUserSchema; // Password not required/editable here
+
+export type UserFormValues = z.infer<typeof baseUserSchema> & { password?: string };
 
 interface UserFormProps {
-  onSubmit: (values: UserFormValues) => Promise<void>;
+  onSubmit: (values: UserFormValues, isNewUser: boolean) => Promise<void>;
   initialData?: User | null;
-  allRoles: UserRole[]; // Pass all available role names
+  allRoles: UserRole[];
   onCancel: () => void;
+  isNewUserFlow: boolean; // To determine if this is for inviting a new user
 }
 
-export function UserForm({ onSubmit, initialData, allRoles, onCancel }: UserFormProps) {
-  const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<UserFormValues>({
-    resolver: zodResolver(userFormSchema),
+export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserFlow }: UserFormProps) {
+  const formSchema = isNewUserFlow ? newUserSchema : editUserSchema;
+
+  const { register, handleSubmit, control, formState: { errors, isSubmitting }, reset } = useForm<UserFormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      name: initialData?.name || '',
-      email: initialData?.email || '',
-      role: initialData?.role || (allRoles.includes('Viewer') ? 'Viewer' : allRoles[0] || ''), // Default to Viewer or first available role
+      name: '',
+      email: '',
+      role: allRoles.includes('Viewer') ? 'Viewer' : allRoles[0] || '',
+      password: '',
     },
   });
 
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        name: initialData.name || '',
+        email: initialData.email || '',
+        role: initialData.role || (allRoles.includes('Viewer') ? 'Viewer' : allRoles[0] || ''),
+        // Do not populate password for existing users
+      });
+    } else if (isNewUserFlow) {
+        reset({
+            name: '',
+            email: '',
+            role: allRoles.includes('Viewer') ? 'Viewer' : allRoles[0] || '',
+            password: '',
+        });
+    }
+  }, [initialData, allRoles, reset, isNewUserFlow]);
+
+
+  const handleFormSubmit = (values: UserFormValues) => {
+    return onSubmit(values, isNewUserFlow);
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 py-4">
       <div>
         <Label htmlFor="name">Full Name</Label>
         <Input id="name" {...register("name")} placeholder="Enter user's full name" />
@@ -49,9 +81,24 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel }: UserForm
 
       <div>
         <Label htmlFor="email">Email Address</Label>
-        <Input id="email" type="email" {...register("email")} placeholder="user@example.com" />
+        <Input 
+          id="email" 
+          type="email" 
+          {...register("email")} 
+          placeholder="user@example.com" 
+          disabled={!isNewUserFlow && !!initialData} // Disable email editing for existing users
+        />
         {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
+        {!isNewUserFlow && !!initialData && <p className="text-xs text-muted-foreground mt-1">Email cannot be changed after creation through this form.</p>}
       </div>
+
+      {isNewUserFlow && (
+        <div>
+          <Label htmlFor="password">Password</Label>
+          <Input id="password" type="password" {...register("password")} placeholder="Enter a strong password" />
+          {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
+        </div>
+      )}
 
       <div>
         <Label htmlFor="role">Role</Label>
@@ -59,7 +106,7 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel }: UserForm
           name="role"
           control={control}
           render={({ field }) => (
-            <Select onValueChange={field.onChange} defaultValue={field.value}>
+            <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
               <SelectTrigger id="role">
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
@@ -83,7 +130,7 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel }: UserForm
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Invite User')}
+          {isSubmitting ? 'Saving...' : (isNewUserFlow ? 'Invite User' : 'Save Changes')}
         </Button>
       </div>
     </form>
