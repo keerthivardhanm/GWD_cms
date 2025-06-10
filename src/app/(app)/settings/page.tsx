@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { useForm, Controller, watch } from 'react-hook-form'; // Added watch
+import { useForm, Controller, watch as useWatch } from 'react-hook-form'; // Renamed watch to useWatch
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ImageIcon, Globe, Shield, Mail, DatabaseBackup, Link as LinkIcon, Palette, Code, Save, RotateCcw, AlertTriangle, Loader2, Users } from "lucide-react"; // Added Users
+import { ImageIcon, Globe, Shield, Mail, DatabaseBackup, Link as LinkIcon, Palette, Code, Save, RotateCcw, AlertTriangle, Loader2, Users } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
@@ -26,8 +26,8 @@ const settingsSchema = z.object({
   // Site Settings
   siteTitle: z.string().optional().default('Apollo CMS'),
   siteTagline: z.string().optional().default(''),
-  siteLogoUrl: z.string().optional().default(''), // URL will be stored after upload
-  faviconUrl: z.string().optional().default(''),  // URL will be stored after upload
+  siteLogoUrl: z.string().url().or(z.literal('')).optional().default(''), // URL will be stored after upload
+  faviconUrl: z.string().url().or(z.literal('')).optional().default(''),  // URL will be stored after upload
   defaultLanguage: z.string().optional().default('en'),
   timeZone: z.string().optional().default('UTC'),
 
@@ -45,10 +45,10 @@ const settingsSchema = z.object({
   metaDescription: z.string().optional().default(''),
   metaKeywords: z.string().optional().default(''),
   robotsTxt: z.string().optional().default('User-agent: *\nAllow: /'),
-  sitemapUrl: z.string().optional().default(''), // URL if manually uploaded/generated
+  sitemapUrl: z.string().url().or(z.literal('')).optional().default(''), // URL if manually uploaded/generated
 
   // Email Notifications
-  senderEmail: z.string().email().or(z.literal('')).optional().default(''),
+  senderEmail: z.string().email({ message: "Invalid email format."}).or(z.literal('')).optional().default(''),
   smtpServer: z.string().optional().default(''),
   smtpPassword: z.string().optional().default(''), // Store securely if real, this is a placeholder
   welcomeEmailTemplate: z.string().optional().default('Welcome to our platform!'),
@@ -60,15 +60,15 @@ const settingsSchema = z.object({
   // Analytics & Integrations
   gaID: z.string().optional().default(''),
   fbPixel: z.string().optional().default(''),
-  metaCode: z.string().optional().default(''),
+  metaCode: z.string().optional().default(''), // For meta tag verification, e.g. Google Search Console
 
   // Theme & Appearance
   themeMode: z.enum(['Light', 'Dark', 'Auto']).optional().default('Auto'),
-  primaryColor: z.string().optional().default('#FF7F50'), // Default to Coral HSL: 16 100% 66%
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color").or(z.literal('')).optional().default('#FF7F50'), // Default to Coral
   fontFamily: z.string().optional().default('Inter'),
 
   // Developer Settings
-  apiBaseUrl: z.string().url().or(z.literal('')).optional().default(''),
+  apiBaseUrl: z.string().url({message: "Invalid URL format."}).or(z.literal('')).optional().default(''),
   envMode: z.enum(['development', 'staging', 'production']).optional().default('development'),
   maintenanceMode: z.boolean().optional().default(false),
   customScriptHeader: z.string().optional().default(''),
@@ -78,7 +78,7 @@ const settingsSchema = z.object({
 type SettingsFormValues = z.infer<typeof settingsSchema>;
 
 const SETTINGS_DOC_ID = "globalAppSettings";
-const SETTINGS_COLLECTION = "config"; // Changed from "settings" to "config" to avoid conflict if "settings" is used for user-specific settings
+const SETTINGS_COLLECTION = "config"; 
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -86,12 +86,11 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const { control, register, handleSubmit, reset, formState: { errors }, watch: watchForm } = useForm<SettingsFormValues>({ // Renamed watch to watchForm
+  const { control, register, handleSubmit, reset, formState: { errors }, watch: watchForm } = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: settingsSchema.parse({}), // Initialize with Zod defaults
+    defaultValues: settingsSchema.parse({}), 
   });
 
-  // Use watchForm to get current values for preview if needed
   const siteLogoUrlPreview = watchForm("siteLogoUrl");
   const faviconUrlPreview = watchForm("faviconUrl");
 
@@ -104,38 +103,50 @@ export default function SettingsPage() {
         const docSnap = await getDoc(settingsDocRef);
         if (docSnap.exists()) {
           const fetchedData = docSnap.data();
-          // Validate and parse fetched data, providing defaults for any missing fields
           const parsedData = settingsSchema.parse(fetchedData);
           reset(parsedData);
         } else {
-          // If no settings exist, form uses Zod defaults defined in settingsSchema
           reset(settingsSchema.parse({}));
-          console.log("No settings document found, using default values.");
+          console.log("No settings document found, using default values from Zod schema.");
         }
       } catch (error) {
         console.error("Error fetching settings:", error);
-        toast({ title: "Error", description: "Failed to load settings.", variant: "destructive" });
-        // Fallback to Zod defaults in case of error
+        toast({ title: "Error", description: "Failed to load settings. Using defaults.", variant: "destructive" });
         reset(settingsSchema.parse({}));
       } finally {
         setIsLoading(false);
       }
     };
-    fetchSettings();
-  }, [reset, toast]);
+    if(user) { // Only fetch if user is available to ensure permissions potentially
+        fetchSettings();
+    } else {
+        setIsLoading(false); // No user, no settings to fetch for now, use defaults
+        reset(settingsSchema.parse({}));
+    }
+  }, [reset, toast, user]);
 
   const onSubmit = async (data: SettingsFormValues) => {
+    if (!user) {
+        toast({ title: "Authentication Error", description: "You must be logged in to save settings.", variant: "destructive"});
+        return;
+    }
     setIsSaving(true);
     try {
       const settingsDocRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOC_ID);
-      // Ensure all fields from schema are present, even if undefined (Zod defaults will apply if not in 'data')
       const dataToSave = settingsSchema.parse(data); 
-      await setDoc(settingsDocRef, { ...dataToSave, lastUpdatedBy: user?.uid, updatedAt: serverTimestamp() }, { merge: true });
-      await logAuditEvent(user, userData, 'SETTINGS_UPDATED', 'GlobalSettings', SETTINGS_DOC_ID, 'Global App Settings', { updatedSettings: Object.keys(dataToSave) });
+      await setDoc(settingsDocRef, { ...dataToSave, lastUpdatedBy: user?.uid, lastUpdatedByName: userData?.name || user?.email, updatedAt: serverTimestamp() }, { merge: true });
+      await logAuditEvent(user, userData, 'SETTINGS_UPDATED', 'GlobalSettings', SETTINGS_DOC_ID, 'Global App Settings', { updatedSettingsKeys: Object.keys(dataToSave) });
       toast({ title: "Success", description: "Settings saved successfully." });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving settings:", error);
-      toast({ title: "Error", description: "Failed to save settings.", variant: "destructive" });
+      let errorMessage = "Failed to save settings.";
+      if (error instanceof z.ZodError) {
+        errorMessage = "Validation error. Please check the fields. Details in console.";
+        console.error("Zod validation errors:", error.errors);
+      } else if (error.message) {
+        errorMessage += ` ${error.message}`;
+      }
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -155,16 +166,16 @@ export default function SettingsPage() {
         title="Global Settings"
         description="Manage system-wide configurations for your Apollo CMS."
         actions={
-            <Button onClick={handleSubmit(onSubmit)} disabled={isSaving}>
+            <Button onClick={handleSubmit(onSubmit)} disabled={isSaving || !user}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} 
                 Save All Settings
             </Button>
         }
       />
 
-      <form> {/* No onSubmit here, PageHeader button triggers it */}
+      <form> {/* No onSubmit here, PageHeader button triggers it via handleSubmit */}
         <Tabs defaultValue="siteSettings" className="space-y-4">
-          <TabsList className="flex flex-wrap h-auto">
+          <TabsList className="flex flex-wrap h-auto justify-start">
             <TabsTrigger value="siteSettings"><ImageIcon className="mr-2 h-4 w-4" />Site Settings</TabsTrigger>
             <TabsTrigger value="userRoles"><Users className="mr-2 h-4 w-4" />User & Roles</TabsTrigger>
             <TabsTrigger value="securitySettings"><Shield className="mr-2 h-4 w-4" />Security</TabsTrigger>
@@ -183,8 +194,8 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div><Label htmlFor="siteTitle">Site Title</Label><Input id="siteTitle" {...register("siteTitle")} />{errors.siteTitle && <p className="text-sm text-destructive">{errors.siteTitle.message}</p>}</div>
                 <div><Label htmlFor="siteTagline">Site Tagline</Label><Input id="siteTagline" {...register("siteTagline")} />{errors.siteTagline && <p className="text-sm text-destructive">{errors.siteTagline.message}</p>}</div>
-                <div><Label htmlFor="siteLogoUpload">Site Logo</Label><Input id="siteLogoUpload" type="file" /><p className="text-xs text-muted-foreground">Current: {siteLogoUrlPreview || "Not set"}. Upload functionality to be implemented.</p></div>
-                <div><Label htmlFor="faviconUpload">Favicon</Label><Input id="faviconUpload" type="file" /><p className="text-xs text-muted-foreground">Current: {faviconUrlPreview || "Not set"}. Upload functionality to be implemented.</p></div>
+                <div><Label htmlFor="siteLogoUrl">Site Logo URL</Label><Input id="siteLogoUrl" type="text" {...register("siteLogoUrl")} placeholder="https://example.com/logo.png" /> {siteLogoUrlPreview && <img src={siteLogoUrlPreview} alt="Logo Preview" className="mt-2 h-16 w-auto object-contain border p-1"/>}<p className="text-xs text-muted-foreground">Enter URL directly. File upload TBD.</p>{errors.siteLogoUrl && <p className="text-sm text-destructive">{errors.siteLogoUrl.message}</p>}</div>
+                <div><Label htmlFor="faviconUrl">Favicon URL</Label><Input id="faviconUrl" type="text" {...register("faviconUrl")} placeholder="https://example.com/favicon.ico"/> {faviconUrlPreview && <img src={faviconUrlPreview} alt="Favicon Preview" className="mt-2 h-8 w-8 object-contain border p-1"/>}<p className="text-xs text-muted-foreground">Enter URL directly. File upload TBD.</p>{errors.faviconUrl && <p className="text-sm text-destructive">{errors.faviconUrl.message}</p>}</div>
                 <div>
                   <Label htmlFor="defaultLanguage">Default Language</Label>
                   <Controller name="defaultLanguage" control={control} render={({ field }) => (
@@ -194,7 +205,7 @@ export default function SettingsPage() {
                 <div>
                   <Label htmlFor="timeZone">Timezone</Label>
                   <Controller name="timeZone" control={control} render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="UTC">UTC</SelectItem><SelectItem value="America/New_York">America/New_York</SelectItem><SelectItem value="Europe/London">Europe/London</SelectItem><SelectItem value="Asia/Kolkata">Asia/Kolkata</SelectItem></SelectContent></Select>
+                    <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="UTC">UTC</SelectItem><SelectItem value="America/New_York">America/New_York (ET)</SelectItem><SelectItem value="Europe/London">Europe/London (GMT)</SelectItem><SelectItem value="Asia/Kolkata">Asia/Kolkata (IST)</SelectItem></SelectContent></Select>
                   )}/>{errors.timeZone && <p className="text-sm text-destructive">{errors.timeZone.message}</p>}
                 </div>
               </CardContent>
@@ -209,7 +220,7 @@ export default function SettingsPage() {
                  <div>
                     <Label htmlFor="defaultUserRole">Default Role for New Sign-ups</Label>
                      <Controller name="defaultUserRole" control={control} render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Viewer">Viewer</SelectItem><SelectItem value="Editor">Editor</SelectItem></SelectContent></Select>
+                        <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Viewer">Viewer</SelectItem><SelectItem value="Editor">Editor</SelectItem><SelectItem value="Subscriber">Subscriber</SelectItem></SelectContent></Select>
                     )}/>
                     <p className="text-xs text-muted-foreground">Note: This applies if self-registration is enabled (not currently implemented).</p>
                     {errors.defaultUserRole && <p className="text-sm text-destructive">{errors.defaultUserRole.message}</p>}
@@ -247,7 +258,7 @@ export default function SettingsPage() {
                 <div><Label htmlFor="metaDescription">Default Meta Description</Label><Textarea id="metaDescription" {...register("metaDescription")} />{errors.metaDescription && <p className="text-sm text-destructive">{errors.metaDescription.message}</p>}</div>
                 <div><Label htmlFor="metaKeywords">Default Meta Keywords (comma-separated)</Label><Input id="metaKeywords" {...register("metaKeywords")} />{errors.metaKeywords && <p className="text-sm text-destructive">{errors.metaKeywords.message}</p>}</div>
                 <div><Label htmlFor="robotsTxt">robots.txt Content</Label><Textarea id="robotsTxt" {...register("robotsTxt")} rows={5} /><p className="text-xs text-muted-foreground">Note: Actual serving of this robots.txt requires web server configuration or dynamic route.</p>{errors.robotsTxt && <p className="text-sm text-destructive">{errors.robotsTxt.message}</p>}</div>
-                <div><Label htmlFor="sitemapUpload">Sitemap Upload/Link</Label><Input id="sitemapUpload" type="text" {...register("sitemapUrl")} placeholder="URL to sitemap.xml" /><p className="text-xs text-muted-foreground">Enter URL or upload. Upload functionality TBD.</p>{errors.sitemapUrl && <p className="text-sm text-destructive">{errors.sitemapUrl.message}</p>}</div>
+                <div><Label htmlFor="sitemapUrl">Sitemap URL</Label><Input id="sitemapUrl" type="text" {...register("sitemapUrl")} placeholder="URL to sitemap.xml (e.g. /sitemap.xml)" /><p className="text-xs text-muted-foreground">Enter URL to your sitemap. Auto-generation TBD.</p>{errors.sitemapUrl && <p className="text-sm text-destructive">{errors.sitemapUrl.message}</p>}</div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -261,7 +272,7 @@ export default function SettingsPage() {
                 <div><Label htmlFor="senderEmail">Sender Email Address (for system notifications)</Label><Input id="senderEmail" type="email" {...register("senderEmail")} />{errors.senderEmail && <p className="text-sm text-destructive">{errors.senderEmail.message}</p>}</div>
                 <div><Label htmlFor="smtpServer">SMTP Server Address</Label><Input id="smtpServer" {...register("smtpServer")} placeholder="e.g., smtp.example.com" />{errors.smtpServer && <p className="text-sm text-destructive">{errors.smtpServer.message}</p>}</div>
                 <div><Label htmlFor="smtpPassword">SMTP Password</Label><Input id="smtpPassword" type="password" {...register("smtpPassword")} />{errors.smtpPassword && <p className="text-sm text-destructive">{errors.smtpPassword.message}</p>}</div>
-                <div><Label htmlFor="welcomeEmailTemplate">Welcome Email Template (HTML/Text)</Label><Textarea id="welcomeEmailTemplate" {...register("welcomeEmailTemplate")} rows={6} />{errors.welcomeEmailTemplate && <p className="text-sm text-destructive">{errors.welcomeEmailTemplate.message}</p>}</div>
+                <div><Label htmlFor="welcomeEmailTemplate">Welcome Email Template (Text or Basic HTML)</Label><Textarea id="welcomeEmailTemplate" {...register("welcomeEmailTemplate")} rows={6} />{errors.welcomeEmailTemplate && <p className="text-sm text-destructive">{errors.welcomeEmailTemplate.message}</p>}</div>
                 <Button type="button" variant="outline" onClick={() => alert("Test email functionality requires backend integration.")}>Send Test Email</Button>
               </CardContent>
             </Card>
@@ -284,7 +295,7 @@ export default function SettingsPage() {
                   )}/>
                 </div>
                 <Button type="button" variant="outline" onClick={() => alert("Backup Now functionality requires backend.")}>Backup Now</Button>
-                <div><Label htmlFor="restoreUpload">Restore from Backup</Label><Input id="restoreUpload" type="file" /><p className="text-xs text-muted-foreground">Upload a previously exported JSON backup file.</p></div>
+                <div><Label htmlFor="restoreFile">Restore from Backup File</Label><Input id="restoreFile" type="file" disabled /><p className="text-xs text-muted-foreground">Upload functionality for restore TBD.</p></div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -296,11 +307,11 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div><Label htmlFor="gaID">Google Analytics Tracking ID</Label><Input id="gaID" {...register("gaID")} placeholder="UA-XXXXXXXXX-X or G-XXXXXXXXXX" />{errors.gaID && <p className="text-sm text-destructive">{errors.gaID.message}</p>}</div>
                 <div><Label htmlFor="fbPixel">Facebook Pixel ID</Label><Input id="fbPixel" {...register("fbPixel")} />{errors.fbPixel && <p className="text-sm text-destructive">{errors.fbPixel.message}</p>}</div>
-                <div><Label htmlFor="metaCode">Meta Site Verification Code</Label><Input id="metaCode" {...register("metaCode")} placeholder="e.g., <meta name='...' content='...'>" />{errors.metaCode && <p className="text-sm text-destructive">{errors.metaCode.message}</p>}</div>
+                <div><Label htmlFor="metaCode">Meta Site Verification Code (HTML Tag)</Label><Input id="metaCode" {...register("metaCode")} placeholder="e.g., <meta name='...' content='...'>" />{errors.metaCode && <p className="text-sm text-destructive">{errors.metaCode.message}</p>}</div>
                 <Label>Google Analytics Dashboard Preview:</Label>
                 <div className="aspect-video bg-muted rounded-md flex items-center justify-center p-4">
                   <p className="text-muted-foreground text-center">Google Analytics iframe placeholder. Configure GA ID and ensure embedding is allowed for live preview. Actual embedding might be blocked by GA policies if not configured correctly.</p>
-                  {/* <iframe src="https://analytics.google.com/...your-dashboard-embed-link" width="100%" height="400" className="border rounded-md"></iframe> */}
+                  {/* Example: <iframe src={`https://analytics.google.com/analytics/web/embed/report/ organiquesourcemediumoverview/aYOUR_ACCOUNT_IDwYOUR_WEB_PROPERTY_IDpYOUR_VIEW_ID`} width="100%" height="400" className="border rounded-md"></iframe> */}
                 </div>
               </CardContent>
             </Card>
@@ -312,19 +323,26 @@ export default function SettingsPage() {
               <CardHeader><CardTitle>Theme & Appearance</CardTitle><CardDescription>Customize the look and feel.</CardDescription></CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="themeMode">Theme Mode</Label>
+                  <Label htmlFor="themeMode">CMS Theme Mode</Label>
                   <Controller name="themeMode" control={control} render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Light">Light</SelectItem><SelectItem value="Dark">Dark</SelectItem><SelectItem value="Auto">Auto (System Preference)</SelectItem></SelectContent></Select>
                   )}/>
                 </div>
-                <div><Label htmlFor="primaryColor">Primary Color (Accent)</Label><Input id="primaryColor" type="color" {...register("primaryColor")} className="h-10 p-1" />{errors.primaryColor && <p className="text-sm text-destructive">{errors.primaryColor.message}</p>}</div>
                 <div>
-                  <Label htmlFor="fontFamily">Default Font Family</Label>
+                  <Label htmlFor="primaryColor">Primary Accent Color (Hex)</Label>
+                  <div className="flex items-center gap-2">
+                    <Input id="primaryColor" type="text" {...register("primaryColor")} placeholder="#FF7F50" className="w-1/2"/>
+                    <Controller name="primaryColor" control={control} render={({field}) => <Input type="color" value={field.value} onChange={field.onChange} className="h-10 p-1 w-12"/> } />
+                  </div>
+                  {errors.primaryColor && <p className="text-sm text-destructive">{errors.primaryColor.message}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="fontFamily">Default CMS Font Family</Label>
                    <Controller name="fontFamily" control={control} render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Inter">Inter</SelectItem><SelectItem value="Roboto">Roboto</SelectItem><SelectItem value="Poppins">Poppins</SelectItem><SelectItem value="Open Sans">Open Sans</SelectItem></SelectContent></Select>
                   )}/>
                 </div>
-                <p className="text-xs text-muted-foreground">Note: Applying these theme changes live requires additional JavaScript to update CSS variables or recompile styles.</p>
+                <p className="text-xs text-muted-foreground">Note: Applying these theme changes live to the CMS admin UI requires additional JavaScript to update CSS variables or recompile styles. Public site theme is separate.</p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -332,7 +350,7 @@ export default function SettingsPage() {
           {/* 9. Developer Settings */}
           <TabsContent value="devSettings">
             <Card>
-              <CardHeader><CardTitle>Developer Settings</CardTitle><CardDescription>Advanced options for developers.</CardDescription></CardHeader>
+              <CardHeader><CardTitle>Developer Settings</CardTitle><CardDescription>Advanced options for developers. Use with caution.</CardDescription></CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-destructive bg-red-50 p-3 rounded-md border border-red-200"><AlertTriangle className="inline h-4 w-4 mr-1" />Modifying these settings can impact site functionality. Ensure you know what you are doing. Access should be restricted to admin users.</p>
                 <div><Label htmlFor="apiBaseUrl">API Base URL (if using external APIs)</Label><Input id="apiBaseUrl" type="url" {...register("apiBaseUrl")} />{errors.apiBaseUrl && <p className="text-sm text-destructive">{errors.apiBaseUrl.message}</p>}</div>
@@ -344,23 +362,23 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <Controller name="maintenanceMode" control={control} render={({ field }) => <Checkbox id="maintenanceMode" checked={field.value} onCheckedChange={field.onChange} />} />
-                  <Label htmlFor="maintenanceMode">Enable Maintenance Mode</Label>
+                  <Label htmlFor="maintenanceMode">Enable Maintenance Mode for Public Site</Label>
                   <p className="text-xs text-muted-foreground">Note: Actual maintenance mode display requires application-level logic.</p>
                 </div>
-                <div><Label htmlFor="customScriptHeader">Custom Scripts (Header - &lt;head&gt;)</Label><Textarea id="customScriptHeader" {...register("customScriptHeader")} rows={4} placeholder="e.g., <script>...</script> or <link rel='stylesheet' href='...'>" />{errors.customScriptHeader && <p className="text-sm text-destructive">{errors.customScriptHeader.message}</p>}</div>
-                <div><Label htmlFor="customScriptFooter">Custom Scripts (Footer - before &lt;/body&gt;)</Label><Textarea id="customScriptFooter" {...register("customScriptFooter")} rows={4} placeholder="e.g., <script>...</script>" />{errors.customScriptFooter && <p className="text-sm text-destructive">{errors.customScriptFooter.message}</p>}</div>
-                 <p className="text-xs text-muted-foreground">Note: Injecting custom scripts requires careful security considerations and specific implementation in your Next.js layout.</p>
+                <div><Label htmlFor="customScriptHeader">Custom Scripts (Header - to be injected into public site &lt;head&gt;)</Label><Textarea id="customScriptHeader" {...register("customScriptHeader")} rows={4} placeholder="e.g., <script>...</script> or <link rel='stylesheet' href='...'>" />{errors.customScriptHeader && <p className="text-sm text-destructive">{errors.customScriptHeader.message}</p>}</div>
+                <div><Label htmlFor="customScriptFooter">Custom Scripts (Footer - to be injected into public site before &lt;/body&gt;)</Label><Textarea id="customScriptFooter" {...register("customScriptFooter")} rows={4} placeholder="e.g., <script>...</script>" />{errors.customScriptFooter && <p className="text-sm text-destructive">{errors.customScriptFooter.message}</p>}</div>
+                 <p className="text-xs text-muted-foreground">Note: Injecting custom scripts requires careful security considerations and specific implementation in your Next.js layout for the public-facing site.</p>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
 
         <div className="mt-8 pt-6 border-t flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => alert("Revert changes functionality TBD.")} disabled={isSaving}>
-                <RotateCcw className="mr-2 h-4 w-4" /> Revert Changes (UI Only)
+            <Button type="button" variant="outline" onClick={() => reset(settingsSchema.parse(getDoc(doc(db, SETTINGS_COLLECTION, SETTINGS_DOC_ID)).then(snap => snap.exists() ? snap.data() : {})))} disabled={isSaving || isLoading}>
+                <RotateCcw className="mr-2 h-4 w-4" /> Revert to Last Saved
             </Button>
-            <Button type="button" variant="destructive" onClick={() => alert("Reset to defaults functionality TBD.")} disabled={isSaving}>
-                <AlertTriangle className="mr-2 h-4 w-4" /> Reset to Defaults (UI Only)
+            <Button type="button" variant="destructive" onClick={() => { reset(settingsSchema.parse({})); toast({title: "Defaults Loaded", description: "Form reset to schema defaults. Click 'Save All Settings' to persist."}) }} disabled={isSaving}>
+                <AlertTriangle className="mr-2 h-4 w-4" /> Reset to Schema Defaults (UI Only)
             </Button>
         </div>
       </form>

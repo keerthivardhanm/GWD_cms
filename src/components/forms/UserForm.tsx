@@ -19,11 +19,13 @@ const baseUserSchema = z.object({
   role: z.string().min(1, "Role is required"),
 });
 
+// Schema for new user creation, password is required
 const newUserSchema = baseUserSchema.extend({
   password: z.string().min(6, "Password must be at least 6 characters long"),
 });
 
-const editUserSchema = baseUserSchema; // Password not required/editable here
+// Schema for editing existing user, password is not part of this form
+const editUserSchema = baseUserSchema; 
 
 export type UserFormValues = z.infer<typeof baseUserSchema> & { password?: string };
 
@@ -32,32 +34,33 @@ interface UserFormProps {
   initialData?: User | null;
   allRoles: UserRole[];
   onCancel: () => void;
-  isNewUserFlow: boolean; // To determine if this is for inviting a new user
+  isNewUserFlow: boolean; // To determine if this is for inviting a new user or editing
 }
 
 export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserFlow }: UserFormProps) {
-  const formSchema = isNewUserFlow ? newUserSchema : editUserSchema;
+  // Determine the schema based on whether it's a new user flow
+  const currentFormSchema = isNewUserFlow ? newUserSchema : editUserSchema;
 
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, reset } = useForm<UserFormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
+    resolver: zodResolver(currentFormSchema),
+    defaultValues: { // Set initial default values
       name: '',
       email: '',
-      role: allRoles.includes('Viewer') ? 'Viewer' : allRoles[0] || '',
-      password: '',
+      role: allRoles.includes('Viewer') ? 'Viewer' : allRoles[0] || '', // Default role
+      password: '', // Password will be empty by default
     },
   });
 
   useEffect(() => {
-    if (initialData) {
+    if (initialData && !isNewUserFlow) { // Editing existing user
       reset({
         name: initialData.name || '',
         email: initialData.email || '',
         role: initialData.role || (allRoles.includes('Viewer') ? 'Viewer' : allRoles[0] || ''),
-        // Do not populate password for existing users
+        // Password field is not part of initialData for editing, and not shown
       });
-    } else if (isNewUserFlow) {
-        reset({
+    } else if (isNewUserFlow) { // Creating a new user
+        reset({ // Reset to fresh defaults for new user
             name: '',
             email: '',
             role: allRoles.includes('Viewer') ? 'Viewer' : allRoles[0] || '',
@@ -68,6 +71,7 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
 
 
   const handleFormSubmit = (values: UserFormValues) => {
+    // The onSubmit prop will handle if it's a new user or an edit based on isNewUserFlow
     return onSubmit(values, isNewUserFlow);
   };
 
@@ -86,16 +90,19 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
           type="email" 
           {...register("email")} 
           placeholder="user@example.com" 
-          disabled={!isNewUserFlow && !!initialData} // Disable email editing for existing users
+          // Disable email editing for existing users as it's tied to Firebase Auth identity
+          disabled={!isNewUserFlow && !!initialData} 
         />
         {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
-        {!isNewUserFlow && !!initialData && <p className="text-xs text-muted-foreground mt-1">Email cannot be changed after creation through this form.</p>}
+        {!isNewUserFlow && !!initialData && (
+            <p className="text-xs text-muted-foreground mt-1">Email cannot be changed after creation.</p>
+        )}
       </div>
 
-      {isNewUserFlow && (
+      {isNewUserFlow && ( // Only show password field for new users
         <div>
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" {...register("password")} placeholder="Enter a strong password" />
+          <Label htmlFor="password">Initial Password</Label>
+          <Input id="password" type="password" {...register("password")} placeholder="Set an initial password" />
           {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
         </div>
       )}
@@ -106,14 +113,18 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
           name="role"
           control={control}
           render={({ field }) => (
-            <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+            <Select 
+              onValueChange={field.onChange} 
+              value={field.value} // Ensure value is controlled
+              defaultValue={field.value} // Set defaultValue for initial render
+            >
               <SelectTrigger id="role">
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
                 {allRoles.length > 0 ? (
-                  allRoles.map(role => (
-                    <SelectItem key={role} value={role}>{role}</SelectItem>
+                  allRoles.map(roleName => ( // Changed variable name for clarity
+                    <SelectItem key={roleName} value={roleName}>{roleName}</SelectItem>
                   ))
                 ) : (
                   <SelectItem value="" disabled>No roles available</SelectItem>
@@ -130,7 +141,7 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : (isNewUserFlow ? 'Invite User' : 'Save Changes')}
+          {isSubmitting ? 'Saving...' : (isNewUserFlow ? 'Invite & Create User' : 'Save Changes')}
         </Button>
       </div>
     </form>
