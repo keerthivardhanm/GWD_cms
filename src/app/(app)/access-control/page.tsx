@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { auth, db } from '@/lib/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth'; // Firebase Auth function
+import { createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'; // Added sendPasswordResetEmail
 import { collection, getDocs, QueryDocumentSnapshot, DocumentData, Timestamp, addDoc, updateDoc, deleteDoc, doc, setDoc, serverTimestamp, query, orderBy, getDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { UserForm, UserFormValues, UserRole } from '@/components/forms/UserForm';
@@ -24,7 +24,7 @@ import { useAuth } from '@/context/AuthContext';
 import { logAuditEvent } from '@/lib/auditLogger';
 
 export interface User {
-  id: string; // This will be the Firebase Auth UID
+  id: string; 
   name: string;
   email: string;
   role: UserRole | string; 
@@ -52,12 +52,14 @@ export const allPermissions = [
     { id: "view_audit_logs", label: "View Audit Logs" },
 ];
 
-// Simulated email sending function
-const sendInvitationEmail = async (email: string, role: string) => {
-  console.log(`SIMULATING EMAIL: User ${email} has been added to the CMS with the role: ${role}. They can now log in with their initial password.`);
-  // In a real app, you'd call a backend API or Firebase Function here
-  // which would use a service like SendGrid, Mailgun, etc.
-  return Promise.resolve();
+// Helper function to generate a random password (for temporary use)
+const generateRandomPassword = (length = 16): string => {
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=";
+  let retVal = "";
+  for (let i = 0, n = charset.length; i < length; ++i) {
+    retVal += charset.charAt(Math.floor(Math.random() * n));
+  }
+  return retVal;
 };
 
 
@@ -73,7 +75,7 @@ export default function AccessControlPage() {
 
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [isNewUserFlow, setIsNewUserFlow] = useState(false); // Explicitly manage if it's new user or edit
+  const [isNewUserFlow, setIsNewUserFlow] = useState(false); 
 
   const [isRoleFormOpen, setIsRoleFormOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
@@ -87,7 +89,7 @@ export default function AccessControlPage() {
       const usersData = querySnapshot.docs.map((docSnap: QueryDocumentSnapshot<DocumentData>) => {
         const data = docSnap.data();
         return {
-          id: docSnap.id, // This is the Firestore document ID, which should match Auth UID
+          id: docSnap.id, 
           name: data.name || 'Unknown User',
           email: data.email || 'no-email@example.com',
           role: data.role || 'Viewer',
@@ -139,53 +141,48 @@ export default function AccessControlPage() {
   }, [fetchUsers, fetchRoles]);
 
   const handleInviteNewUser = () => {
-    setEditingUser(null); // Ensure no existing user data is carried over
-    setIsNewUserFlow(true); // Set flag for new user
+    setEditingUser(null); 
+    setIsNewUserFlow(true); 
     setIsUserFormOpen(true);
   };
 
   const handleEditUser = (userToEdit: User) => {
     setEditingUser(userToEdit);
-    setIsNewUserFlow(false); // Set flag for editing existing user
+    setIsNewUserFlow(false); 
     setIsUserFormOpen(true);
   };
 
   const handleUserFormSubmit = async (values: UserFormValues, isNew: boolean) => {
     try {
-      if (isNew) { // Creating a new user (isNewUserFlow was true)
-        if (!values.password) { // Password should be required by form validation, but double-check
-          toast({ title: "Error", description: "Password is required for new users.", variant: "destructive"});
-          return;
-        }
-        // 1. Create Firebase Auth user
-        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      if (isNew) { // Creating a new user
+        const randomPassword = generateRandomPassword(); // Generate a random password
+        
+        // 1. Create Firebase Auth user with the random password
+        const userCredential = await createUserWithEmailAndPassword(auth, values.email, randomPassword);
         const newAuthUser = userCredential.user;
 
-        // 2. Create Firestore user profile with Auth UID as document ID
+        // 2. Create Firestore user profile
         const userProfileData = {
-          // id: newAuthUser.uid, // Not needed, doc ID is UID
           name: values.name,
-          email: values.email, // Store email in Firestore as well for easier display
+          email: values.email,
           role: values.role,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          // lastLogin can be updated by a Firebase Function on user sign-in or manually
         };
         await setDoc(doc(db, "users", newAuthUser.uid), userProfileData);
         
-        await logAuditEvent(authUser, authUserData, 'USER_CREATED', 'User', newAuthUser.uid, values.name, { name: values.name, email: values.email, role: values.role });
-        toast({ title: "Success", description: "User created successfully in Firebase Auth and Firestore." });
+        // 3. Send password reset email
+        await sendPasswordResetEmail(auth, values.email);
         
-        // 3. Send "invitation" email (simulated)
-        await sendInvitationEmail(values.email, values.role);
-
+        await logAuditEvent(authUser, authUserData, 'USER_CREATED', 'User', newAuthUser.uid, values.name, { name: values.name, email: values.email, role: values.role });
+        toast({ title: "User Created", description: `User ${values.email} created successfully. A password reset email has been sent to them.` });
+        
       } else if (editingUser) { // Editing an existing user
         const userRef = doc(db, "users", editingUser.id);
-        // Note: Email cannot be changed here directly for Auth user (form field is disabled). Password not changed here.
         const updateData = {
           name: values.name,
           role: values.role,
-          // email: values.email, // Do not update email if it's tied to Firebase Auth email directly
+          // email: values.email, // Email change is disabled in form for existing users
           updatedAt: serverTimestamp(),
         };
         await updateDoc(userRef, updateData);
@@ -194,14 +191,15 @@ export default function AccessControlPage() {
       }
       setIsUserFormOpen(false);
       setEditingUser(null);
-      setIsNewUserFlow(false); // Reset flow state
-      fetchUsers(); // Refresh user list
+      setIsNewUserFlow(false); 
+      fetchUsers(); 
     } catch (err: any) {
       console.error("Error saving user:", err);
       let errorMessage = `Failed to save user. ${err.message || ''}`;
       if (err.code === 'auth/email-already-in-use') {
         errorMessage = "This email address is already in use by another Auth account.";
       } else if (err.code === 'auth/weak-password') {
+        // This should not happen with random password, but good to keep if admin could set it
         errorMessage = "The password is too weak (must be at least 6 characters).";
       }
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
@@ -209,19 +207,16 @@ export default function AccessControlPage() {
   };
 
   const handleDeleteUser = async (userId: string, userName: string) => {
-    // Note: Deleting a user from Firestore here.
-    // For full cleanup, you'd also need to delete the Firebase Auth user,
-    // which requires Admin SDK privileges (typically done in a Cloud Function).
-    // This frontend-only delete will only remove the Firestore profile.
-    // Consider adding a confirmation for Auth user deletion or instructions.
     if (authUser?.uid === userId) {
         toast({ title: "Cannot Delete Self", description: "You cannot delete your own user account.", variant: "destructive" });
         return;
     }
     try {
+      // Note: This only deletes the Firestore profile. 
+      // Deleting the Firebase Auth user requires Admin SDK (Cloud Function).
       await deleteDoc(doc(db, "users", userId));
       await logAuditEvent(authUser, authUserData, 'USER_DELETED', 'User', userId, userName);
-      toast({ title: "Success", description: `User profile "${userName}" removed successfully from Firestore. Firebase Auth account may still exist.` });
+      toast({ title: "User Profile Removed", description: `User profile "${userName}" removed from Firestore. Firebase Auth account may still exist.` });
       fetchUsers();
     } catch (err) {
       console.error("Error removing user:", err);
@@ -273,8 +268,7 @@ export default function AccessControlPage() {
         toast({ title: "Cannot Delete Role", description: `Role "${roleName}" is currently assigned to ${usersWithRole.length} user(s). Reassign users before deleting.`, variant: "destructive"});
         return;
     }
-    // Prevent deletion of core/default roles
-    if (['Admin', 'Editor', 'Viewer'].includes(roleName)) { // Assuming these are your default/core roles
+    if (['Admin', 'Editor', 'Viewer'].includes(roleName)) { 
         toast({ title: "Cannot Delete Role", description: `Cannot delete default role "${roleName}".`, variant: "destructive"});
         return;
     }
@@ -357,7 +351,7 @@ export default function AccessControlPage() {
                                       <DropdownMenuItem 
                                         onSelect={(e) => e.preventDefault()} 
                                         className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                        disabled={authUser?.uid === user.id} // Disable if trying to delete self
+                                        disabled={authUser?.uid === user.id} 
                                       >
                                         <Trash2 className="mr-2 h-4 w-4" /> Remove User Profile
                                       </DropdownMenuItem>
@@ -460,7 +454,7 @@ export default function AccessControlPage() {
                                         <Checkbox
                                             id={`${role.id}-${perm.id}`}
                                             checked={role.permissions.includes(perm.id)}
-                                            disabled // Display only, editing happens in RoleForm
+                                            disabled 
                                             className="cursor-default"
                                         />
                                         <Label htmlFor={`${role.id}-${perm.id}`} className="text-xs font-normal cursor-default">{perm.label}</Label>
@@ -477,7 +471,7 @@ export default function AccessControlPage() {
 
      <Dialog open={isUserFormOpen} onOpenChange={(isOpen) => {
           setIsUserFormOpen(isOpen);
-          if (!isOpen) { // Reset state when dialog closes
+          if (!isOpen) { 
             setEditingUser(null);
             setIsNewUserFlow(false);
           }
@@ -486,13 +480,12 @@ export default function AccessControlPage() {
           <DialogHeader>
             <DialogTitle>{isNewUserFlow ? "Invite New User" : "Edit User Profile"}</DialogTitle>
             <DialogDescription>
-              {isNewUserFlow ? "Fill in the details for the new user and set an initial password. An email notification (simulated) will be sent." : "Make changes to the user details here."} Click save when you're done.
+              {isNewUserFlow ? "Fill in the details for the new user. They will receive an email to set their password." : "Make changes to the user details here."} Click save when you're done.
             </DialogDescription>
           </DialogHeader>
-          {/* Ensure UserForm is re-rendered with correct props when isUserFormOpen changes */}
           {isUserFormOpen && (
             <UserForm
-                key={isNewUserFlow ? 'new-user-form' : (editingUser?.id || 'edit-user-form')} // Key to force re-render
+                key={isNewUserFlow ? 'new-user-form' : (editingUser?.id || 'edit-user-form')} 
                 onSubmit={handleUserFormSubmit}
                 initialData={editingUser}
                 allRoles={roles.map(r => r.name as UserRole)} 

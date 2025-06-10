@@ -13,37 +13,28 @@ import type { User } from '@/app/(app)/access-control/page'; // Import User type
 
 export type UserRole = string;
 
-const baseUserSchema = z.object({
+// Base schema for user details, password is not included here
+const userFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
   email: z.string().email("Invalid email address").min(1, "Email is required"),
-  role: z.string().min(1, "Role is required"), // Role itself cannot be an empty string per schema
+  role: z.string().min(1, "Role is required"), 
 });
 
-// Schema for new user creation, password is required
-const newUserSchema = baseUserSchema.extend({
-  password: z.string().min(6, "Password must be at least 6 characters long"),
-});
-
-// Schema for editing existing user, password is not part of this form
-const editUserSchema = baseUserSchema;
-
-export type UserFormValues = z.infer<typeof baseUserSchema> & { password?: string };
+// For UserFormValues, password is not part of the form data collected from admin for new users
+export type UserFormValues = z.infer<typeof userFormSchema>;
 
 interface UserFormProps {
   onSubmit: (values: UserFormValues, isNewUser: boolean) => Promise<void>;
   initialData?: User | null;
   allRoles: UserRole[];
   onCancel: () => void;
-  isNewUserFlow: boolean; // To determine if this is for inviting a new user or editing
+  isNewUserFlow: boolean; 
 }
 
 export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserFlow }: UserFormProps) {
-  const currentFormSchema = isNewUserFlow ? newUserSchema : editUserSchema;
+  // The same schema is used for both new and edit, as admin doesn't set password for new users.
+  const currentFormSchema = userFormSchema; 
 
-  // Determine the default role. If initialData.role is present, use it.
-  // Otherwise, if allRoles has 'Viewer', use 'Viewer'.
-  // Otherwise, if allRoles has items, use the first one.
-  // Otherwise (allRoles is empty), use undefined (so placeholder shows).
   let determinedDefaultRole: string | undefined = undefined;
   if (initialData?.role) {
     determinedDefaultRole = initialData.role;
@@ -55,19 +46,16 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
     }
   }
 
-
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, reset } = useForm<UserFormValues>({
     resolver: zodResolver(currentFormSchema),
     defaultValues: {
       name: initialData?.name || '',
       email: initialData?.email || '',
       role: determinedDefaultRole,
-      password: '',
     },
   });
 
   useEffect(() => {
-    // Recalculate default role for reset, similar to above logic
     let defaultRoleForReset: string | undefined = undefined;
     if (initialData?.role) {
         defaultRoleForReset = initialData.role;
@@ -86,18 +74,15 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
         role: defaultRoleForReset,
       });
     } else if (isNewUserFlow) {
-        reset({
+        reset({ // Reset for new user, no password field
             name: '',
             email: '',
-            role: defaultRoleForReset, // Use the same logic for new users
-            password: '',
+            role: defaultRoleForReset,
         });
     }
   }, [initialData, allRoles, reset, isNewUserFlow]);
 
-
   const handleFormSubmit = (values: UserFormValues) => {
-    // Zod schema ensures role is a non-empty string if submitted.
     return onSubmit(values, isNewUserFlow);
   };
 
@@ -116,21 +101,17 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
           type="email"
           {...register("email")}
           placeholder="user@example.com"
-          disabled={!isNewUserFlow && !!initialData}
+          // Email can be edited for existing users if desired, but for Auth users, it's more complex.
+          // Disabling for edit mode simplifies things to prevent desync with Firebase Auth email.
+          disabled={!isNewUserFlow && !!initialData} 
         />
         {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
         {!isNewUserFlow && !!initialData && (
-            <p className="text-xs text-muted-foreground mt-1">Email cannot be changed after creation.</p>
+            <p className="text-xs text-muted-foreground mt-1">Email cannot be changed after creation for existing users via this form.</p>
         )}
       </div>
 
-      {isNewUserFlow && (
-        <div>
-          <Label htmlFor="password">Initial Password</Label>
-          <Input id="password" type="password" {...register("password")} placeholder="Set an initial password" />
-          {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
-        </div>
-      )}
+      {/* Password field is removed for new user flow as admin doesn't set it */}
 
       <div>
         <Label htmlFor="role">Role</Label>
@@ -140,8 +121,6 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
           render={({ field }) => (
             <Select
               onValueChange={field.onChange}
-              // If field.value is undefined (e.g. initially when no roles and no initialData),
-              // passing '' to Select value allows placeholder to show.
               value={field.value || ''}
             >
               <SelectTrigger id="role">
@@ -150,12 +129,9 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
               <SelectContent>
                 {allRoles.length > 0 ? (
                   allRoles.map(roleName => (
-                    // Zod schema for role name should prevent roleName from being empty.
-                    // key and value must be non-empty strings.
                     roleName ? <SelectItem key={roleName} value={roleName}>{roleName}</SelectItem> : null
                   ))
                 ) : (
-                  // Display a message if no roles are available. Do NOT use SelectItem with value="".
                   <div className="px-2 py-1.5 text-sm text-muted-foreground">No roles available</div>
                 )}
               </SelectContent>
@@ -170,7 +146,7 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : (isNewUserFlow ? 'Invite & Create User' : 'Save Changes')}
+          {isSubmitting ? 'Saving...' : (isNewUserFlow ? 'Create & Send Invite' : 'Save Changes')}
         </Button>
       </div>
     </form>
