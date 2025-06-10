@@ -6,18 +6,19 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { KeyMetricCard } from "@/components/dashboard/KeyMetricsCard";
 import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart";
 import { KeepNotes } from "@/components/dashboard/KeepNotes";
-import { RecentActivityFeed, RecentActivityItem } from "@/components/dashboard/RecentActivityFeed";
+import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed"; // Still used for type of recent content items
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Package, Settings, FileClock, Loader2 } from "lucide-react";
+import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Package, Settings, FileClock, Loader2, ListChecks, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import React, { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, orderBy, limit, Timestamp,getCountFromServer } from 'firebase/firestore';
-import type { Page as PageData } from '@/app/(app)/pages/page'; // Ensure correct type import
+import { collection, getDocs, query, orderBy, limit, Timestamp, getCountFromServer } from 'firebase/firestore';
+import type { Page as PageData } from '@/app/(app)/pages/page';
 import type { ContentBlock } from '@/app/(app)/content-blocks/page';
-
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 const gaData = {
   mostVisited: [
@@ -49,16 +50,29 @@ interface DashboardMetrics {
   totalUsers: number;
 }
 
+interface AuditLogEntry {
+  id: string;
+  userName: string;
+  action: string;
+  entityType?: string;
+  entityName?: string;
+  timestamp: string;
+}
+
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentItems, setRecentItems] = useState<RecentActivityItem[]>([]);
+  const [recentAuditLogs, setRecentAuditLogs] = useState<AuditLogEntry[]>([]);
   const [loadingMetrics, setLoadingMetrics] = useState(true);
-  const [loadingRecent, setLoadingRecent] = useState(true);
+  const [loadingRecentContent, setLoadingRecentContent] = useState(true);
+  const [loadingRecentAuditLogs, setLoadingRecentAuditLogs] = useState(true);
 
   useEffect(() => {
     async function fetchDashboardData() {
       setLoadingMetrics(true);
-      setLoadingRecent(true);
+      setLoadingRecentContent(true);
+      setLoadingRecentAuditLogs(true);
+
       try {
         // Fetch counts
         const pagesCol = collection(db, "pages");
@@ -81,7 +95,7 @@ export default function DashboardPage() {
         });
         setLoadingMetrics(false);
 
-        // Fetch recent items
+        // Fetch recent content items
         const recentPagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc"), limit(3));
         const recentBlocksQuery = query(collection(db, "contentBlocks"), orderBy("updatedAt", "desc"), limit(2));
 
@@ -100,7 +114,7 @@ export default function DashboardPage() {
             type: "Page",
             lastModified: page.updatedAt instanceof Timestamp ? page.updatedAt.toDate().toLocaleDateString() : 'N/A',
             editor: page.author || 'Unknown',
-            url: `/pages`, // Link to the general pages management, specific edit later
+            url: `/pages`,
             icon: FileText,
           });
         });
@@ -112,26 +126,43 @@ export default function DashboardPage() {
             title: block.name,
             type: "Block",
             lastModified: block.updatedAt instanceof Timestamp ? block.updatedAt.toDate().toLocaleDateString() : 'N/A',
-            editor: 'N/A', // ContentBlock schema doesn't have an author field yet
+            editor: 'N/A',
             url: `/content-blocks`,
             icon: Grid,
           });
         });
         
-        // Sort all recent items by lastModified date (descending)
         fetchedRecentItems.sort((a, b) => {
             const dateA = new Date(a.lastModified === 'N/A' ? 0 : a.lastModified);
             const dateB = new Date(b.lastModified === 'N/A' ? 0 : b.lastModified);
             return dateB.getTime() - dateA.getTime();
         });
+        setRecentItems(fetchedRecentItems.slice(0, 5));
+        setLoadingRecentContent(false);
 
-        setRecentItems(fetchedRecentItems.slice(0, 5)); // Take top 5 overall
-
+        // Fetch recent audit logs
+        const auditLogsQuery = query(collection(db, "auditLogs"), orderBy("timestamp", "desc"), limit(5));
+        const auditLogsSnapshot = await getDocs(auditLogsQuery);
+        const fetchedAuditLogs = auditLogsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            const ts = data.timestamp instanceof Timestamp ? data.timestamp.toDate() : new Date();
+            return {
+                id: doc.id,
+                userName: data.userName || data.userId || 'System',
+                action: data.action || 'Unknown Action',
+                entityType: data.entityType,
+                entityName: data.entityName || data.entityId,
+                timestamp: ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString(),
+            };
+        });
+        setRecentAuditLogs(fetchedAuditLogs);
+        
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
         setLoadingMetrics(false);
-        setLoadingRecent(false);
+        setLoadingRecentContent(false);
+        setLoadingRecentAuditLogs(false);
       }
     }
     fetchDashboardData();
@@ -238,7 +269,7 @@ export default function DashboardPage() {
                     <CardDescription>Quick access to recently updated items in the CMS.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {loadingRecent ? (
+                    {loadingRecentContent ? (
                         <div className="flex justify-center items-center h-20">
                             <Loader2 className="h-6 w-6 animate-spin text-primary" />
                         </div>
@@ -259,7 +290,6 @@ export default function DashboardPage() {
                                     </div>
                                     </div>
                                     <Button variant="ghost" size="sm" asChild className="text-xs shrink-0">
-                                    {/* Link to edit specific item if possible, or general management page */}
                                     <Link href={item.type === 'Page' ? `/pages?edit=${item.id}` : `/content-blocks?edit=${item.id}`}><Edit2 className="mr-1 h-3 w-3" /> Edit</Link>
                                     </Button>
                                 </div>
@@ -274,8 +304,50 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <RecentActivityFeed />
+      <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+                <CardTitle className="flex items-center gap-2">
+                    <ListChecks className="h-5 w-5" />
+                    Recent Audit Log Activity
+                </CardTitle>
+                <CardDescription>A quick glance at the latest system activities.</CardDescription>
+            </div>
+            <Button asChild variant="outline" size="sm">
+                <Link href="/audit-logs">
+                    <ShieldAlert className="mr-2 h-4 w-4"/> View All Audit Logs
+                </Link>
+            </Button>
+        </CardHeader>
+        <CardContent>
+            {loadingRecentAuditLogs ? (
+                <div className="flex justify-center items-center h-40">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+            ) : recentAuditLogs.length > 0 ? (
+                <ScrollArea className="h-[250px]">
+                <div className="space-y-4">
+                    {recentAuditLogs.map((log) => (
+                    <div key={log.id} className="flex items-start gap-3">
+                        <Avatar className="h-9 w-9 mt-1">
+                            <AvatarImage src={`https://placehold.co/40x40.png?text=${log.userName.substring(0,1)}`} alt={log.userName} data-ai-hint="user avatar" />
+                            <AvatarFallback>{log.userName.substring(0,2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                        <p className="text-sm font-medium leading-none">
+                            <span className="font-semibold">{log.userName}</span> {log.action.toLowerCase().replace('_', ' ')} {log.entityType && <Badge variant="secondary" className="ml-1 text-xs">{log.entityType}</Badge>} <span className="text-muted-foreground">{log.entityName && log.entityName !== log.id ? `"${log.entityName}"` : ''}</span>.
+                        </p>
+                        <p className="text-xs text-muted-foreground">{log.timestamp}</p>
+                        </div>
+                    </div>
+                    ))}
+                </div>
+                </ScrollArea>
+            ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No recent audit log activity.</p>
+            )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
-
