@@ -6,9 +6,9 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { KeyMetricCard } from "@/components/dashboard/KeyMetricsCard";
 import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart";
 import { KeepNotes } from "@/components/dashboard/KeepNotes";
-import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed"; // Still used for type of recent content items
+import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Package, Settings, FileClock, Loader2, ListChecks, ShieldAlert } from "lucide-react";
+import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Package, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,15 +19,8 @@ import type { Page as PageData } from '@/app/(app)/pages/page';
 import type { ContentBlock } from '@/app/(app)/content-blocks/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { fetchGaData, type GaDataOutput } from '@/ai/flows/fetch-ga-data-flow';
 
-const gaData = {
-  mostVisited: [
-    { page: "/home", visits: 1200 },
-    { page: "/about", visits: 950 },
-    { page: "/products", visits: 780 },
-  ],
-  bounceRate: 45.6,
-};
 
 const contentCreationData = [
   { date: "2024-07-01", pages: 5, blocks: 12, files: 3 },
@@ -63,15 +56,19 @@ export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentItems, setRecentItems] = useState<RecentActivityItem[]>([]);
   const [recentAuditLogs, setRecentAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [gaData, setGaData] = useState<GaDataOutput | null>(null);
   const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [loadingRecentContent, setLoadingRecentContent] = useState(true);
   const [loadingRecentAuditLogs, setLoadingRecentAuditLogs] = useState(true);
+  const [loadingGaData, setLoadingGaData] = useState(true);
+  const [gaError, setGaError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchDashboardData() {
       setLoadingMetrics(true);
       setLoadingRecentContent(true);
       setLoadingRecentAuditLogs(true);
+      setLoadingGaData(true);
 
       try {
         // Fetch counts
@@ -93,7 +90,7 @@ export default function DashboardPage() {
           totalContentBlocks: blocksSnapshot.data().count,
           totalUsers: usersSnapshot.data().count,
         });
-        setLoadingMetrics(false);
+        
 
         // Fetch recent content items
         const recentPagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc"), limit(3));
@@ -126,7 +123,7 @@ export default function DashboardPage() {
             title: block.name,
             type: "Block",
             lastModified: block.updatedAt instanceof Timestamp ? block.updatedAt.toDate().toLocaleDateString() : 'N/A',
-            editor: 'N/A',
+            editor: 'N/A', 
             url: `/content-blocks`,
             icon: Grid,
           });
@@ -138,7 +135,7 @@ export default function DashboardPage() {
             return dateB.getTime() - dateA.getTime();
         });
         setRecentItems(fetchedRecentItems.slice(0, 5));
-        setLoadingRecentContent(false);
+        
 
         // Fetch recent audit logs
         const auditLogsQuery = query(collection(db, "auditLogs"), orderBy("timestamp", "desc"), limit(5));
@@ -156,13 +153,23 @@ export default function DashboardPage() {
             };
         });
         setRecentAuditLogs(fetchedAuditLogs);
+
+        // Fetch GA Data
+        const gaResult = await fetchGaData();
+        if (gaResult.error) {
+          setGaError(gaResult.error);
+        } else {
+          setGaData(gaResult);
+        }
         
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
+        // Set specific errors if needed, or a general one
       } finally {
         setLoadingMetrics(false);
         setLoadingRecentContent(false);
         setLoadingRecentAuditLogs(false);
+        setLoadingGaData(false);
       }
     }
     fetchDashboardData();
@@ -179,14 +186,14 @@ export default function DashboardPage() {
         {loadingMetrics || !metrics ? (
             <>
                 <KeyMetricCard title="Total Pages" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={FileText} />
-                <KeyMetricCard title="Total Files" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Files} />
+                <KeyMetricCard title="Total Media Files" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Files} />
                 <KeyMetricCard title="Content Blocks" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Grid} />
                 <KeyMetricCard title="Total Users" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Users} />
             </>
         ) : (
             <>
                 <KeyMetricCard title="Total Pages" value={metrics.totalPages} icon={FileText} description="Published & drafts" />
-                <KeyMetricCard title="Total Files" value={metrics.totalFiles} icon={Files} description="In media library" />
+                <KeyMetricCard title="Total Media Files" value={metrics.totalFiles} icon={Files} description="In media library" />
                 <KeyMetricCard title="Content Blocks" value={metrics.totalContentBlocks} icon={Grid} description="Reusable content units" />
                 <KeyMetricCard title="Total Users" value={metrics.totalUsers} icon={Users} description="Registered accounts" />
             </>
@@ -223,7 +230,8 @@ export default function DashboardPage() {
             <CardTitle className="flex items-center gap-2">
              <BarChart3 className="h-5 w-5" /> Google Analytics Overview
             </CardTitle>
-            <CardDescription>Live insights from your Google Analytics property (Placeholder).
+            <CardDescription>
+              Insights from your Google Analytics property (Last 7 days).
               <Button variant="link" size="sm" asChild className="ml-2 p-0 h-auto">
                 <a href="https://analytics.google.com/" target="_blank" rel="noopener noreferrer" >
                   Open GA <ExternalLink className="ml-1 h-3 w-3" />
@@ -232,29 +240,52 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
-              <p className="text-muted-foreground">Google Analytics iframe will be embedded here.</p>
-            </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {loadingGaData && (
+              <div className="flex items-center justify-center p-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="ml-2">Loading Google Analytics data...</p>
+              </div>
+            )}
+            {gaError && !loadingGaData && (
+              <div className="p-4 text-center text-destructive bg-destructive/10 rounded-md">
+                <p>Error loading GA Data: {gaError}</p>
+                <p className="text-xs mt-1">Ensure GA_PROPERTY_ID and GOOGLE_APPLICATION_CREDENTIALS_JSON_STRING are correctly set in .env.local and the service account has 'Viewer' permission on the GA property.</p>
+              </div>
+            )}
+            {!loadingGaData && !gaError && gaData && (
+              <div className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <KeyMetricCard title="Active Users (7d)" value={gaData.activeUsers || '0'} icon={Users} />
+                  <KeyMetricCard title="New Users (7d)" value={gaData.newUsers || '0'} icon={UserPlus} />
+                  <KeyMetricCard title="Page Views (7d)" value={gaData.screenPageViews || '0'} icon={Activity} />
+                </div>
+                
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-base">Most Visited Pages</CardTitle>
+                        <CardTitle className="text-base">Top Pages (Last 7 Days)</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <ul className="space-y-1 text-sm">
-                            {gaData.mostVisited.map(p => <li key={p.page}>{p.page} ({p.visits} visits)</li>)}
-                        </ul>
+                      {gaData.topPages && gaData.topPages.length > 0 ? (
+                        <ScrollArea className="h-[150px]">
+                          <ul className="space-y-2 text-sm">
+                            {gaData.topPages.map(p => (
+                              <li key={p.pagePath} className="flex justify-between items-center">
+                                <span className="truncate" title={p.pagePath}>{p.pagePath}</span>
+                                <Badge variant="secondary">{p.screenPageViews} views</Badge>
+                              </li>
+                            ))}
+                          </ul>
+                        </ScrollArea>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No top pages data available or no views recorded.</p>
+                      )}
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base">Bounce Rate</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-3xl font-bold">{gaData.bounceRate}%</p>
-                    </CardContent>
-                </Card>
-            </div>
+              </div>
+            )}
+            {!loadingGaData && !gaError && !gaData && (
+                 <p className="p-4 text-center text-muted-foreground">No Google Analytics data available.</p>
+            )}
           </CardContent>
         </Card>
         

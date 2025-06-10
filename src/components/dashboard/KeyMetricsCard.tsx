@@ -2,10 +2,11 @@
 import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ReactNode } from 'react';
+import { UserPlus } from 'lucide-react'; // Used in dashboard for new users
 
 interface KeyMetricCardProps {
   title: string;
-  value: string | number | ReactNode; // Allow ReactNode for loading spinner
+  value: string | number | ReactNode; 
   icon: LucideIcon;
   description?: string;
 }
