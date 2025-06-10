@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import Image from 'next/image'; // Import next/image
+// import Image from 'next/image'; // Removed next/image
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react'; 
+import { Loader2, ShieldCheck } from 'lucide-react'; // Added ShieldCheck
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/context/AuthContext';
 import { useEffect } from 'react';
@@ -45,10 +45,6 @@ export default function LoginPage() {
     }
   };
 
-  // Placeholder logo URL - replace with your actual hosted logo
-  const logoUrl = "https://placehold.co/200x55.png?text=Apollo+Allied+Health+Academy"; 
-  // Original logo seems to be around 400x110. For login page, let's use 200x55.
-
   if (authLoading && !user) { 
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -68,16 +64,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40 p-4">
       <div className="mb-8 text-center">
-        <div className="flex justify-center mb-4">
-          <Image 
-            src={logoUrl} 
-            alt={`${APP_NAME} Logo`} 
-            width={200} 
-            height={55}
-            priority
-            data-ai-hint="app logo"
-          />
-        </div>
+        <ShieldCheck className="mx-auto h-16 w-16 text-primary mb-4" data-ai-hint="app logo shield" />
         <h1 className="text-3xl font-bold text-foreground mt-2">Welcome to {APP_NAME}</h1>
         <p className="text-muted-foreground">Sign in to access your dashboard.</p>
       </div>

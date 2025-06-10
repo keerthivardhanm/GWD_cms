@@ -3,9 +3,9 @@
 
 import React from "react"; 
 import Link from "next/link";
-import Image from 'next/image'; // Import next/image
+// import Image from 'next/image'; // Removed next/image import
 import { usePathname } from "next/navigation";
-import { LogOut, Settings2, UserCircle } from "lucide-react"; 
+import { LogOut, Settings2, UserCircle, ShieldCheck } from "lucide-react"; // Added ShieldCheck
 
 import { NAV_ITEMS, APP_NAME, type NavItem } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -85,10 +85,6 @@ export function AppSidebar() {
   const displayEmail = userData?.email || user?.email || "user@example.com";
   const avatarFallback = getInitials(displayName);
 
-  // Placeholder logo URL - replace with your actual hosted logo
-  const logoUrl = "https://placehold.co/180x50.png?text=Apollo+Allied+Health"; 
-  // Original logo seems to be around 400x110. For sidebar, a smaller version.
-
   const renderNavItems = (items: NavItem[]) => {
     return items.map((item, index) => {
       if (item.groupLabel) {
@@ -136,28 +132,10 @@ export function AppSidebar() {
   return (
     <Sidebar variant="sidebar" collapsible="icon" className="shadow-md">
       <SidebarHeader className="border-b border-sidebar-border">
-        <Link href="/dashboard" className="flex items-center gap-2 py-2 px-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center">
-          <div className="relative h-8 w-8 group-data-[collapsible=expanded]:h-10 group-data-[collapsible=expanded]:w-auto group-data-[collapsible=expanded]:min-w-[150px]">
-            <Image 
-                src={logoUrl} 
-                alt={`${APP_NAME} Logo`} 
-                width={180} // Max width when expanded
-                height={50} // Max height
-                className="object-contain group-data-[collapsible=icon]:hidden"
-                data-ai-hint="app logo"
-            />
-            {/* Icon only version for collapsed state */}
-            <Image 
-                src={"https://placehold.co/40x40.png?text=A"} // Simplified placeholder for icon state
-                alt={`${APP_NAME} Icon`} 
-                width={32} 
-                height={32} 
-                className="object-contain group-data-[collapsible=expanded]:hidden mx-auto"
-                data-ai-hint="app icon"
-            />
-          </div>
+        <Link href="/dashboard" className="flex items-center gap-2 py-2 px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:py-3">
+          <ShieldCheck className="h-7 w-7 text-primary group-data-[collapsible=expanded]:h-8 group-data-[collapsible=expanded]:w-8" data-ai-hint="app logo shield" />
           <span className="text-xl font-semibold tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-            {/* APP_NAME is displayed by the logo image when expanded */}
+            {APP_NAME}
           </span>
         </Link>
       </SidebarHeader>

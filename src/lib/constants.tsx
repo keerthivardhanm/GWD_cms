@@ -6,10 +6,9 @@ import {
   Boxes,
   Database,
   Grid,
-  ShieldCheck,
+  ShieldCheck, // Changed from Bug
   History,
   Settings,
-  // ImageIcon, // No longer needed as Media Manager is removed
   ClipboardList,
   Search,
   Users
@@ -52,4 +51,4 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-export const APP_NAME = "Apollo Allied Health Academy";
+export const APP_NAME = "Apollo CMS"; // Reverted from "Apollo Allied Health Academy"
