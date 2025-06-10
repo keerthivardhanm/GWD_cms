@@ -11,12 +11,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { User } from '@/app/(app)/access-control/page'; // Import User type
 
-export type UserRole = string; 
+export type UserRole = string;
 
 const baseUserSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
   email: z.string().email("Invalid email address").min(1, "Email is required"),
-  role: z.string().min(1, "Role is required"),
+  role: z.string().min(1, "Role is required"), // Role itself cannot be an empty string per schema
 });
 
 // Schema for new user creation, password is required
@@ -25,7 +25,7 @@ const newUserSchema = baseUserSchema.extend({
 });
 
 // Schema for editing existing user, password is not part of this form
-const editUserSchema = baseUserSchema; 
+const editUserSchema = baseUserSchema;
 
 export type UserFormValues = z.infer<typeof baseUserSchema> & { password?: string };
 
@@ -38,32 +38,58 @@ interface UserFormProps {
 }
 
 export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserFlow }: UserFormProps) {
-  // Determine the schema based on whether it's a new user flow
   const currentFormSchema = isNewUserFlow ? newUserSchema : editUserSchema;
+
+  // Determine the default role. If initialData.role is present, use it.
+  // Otherwise, if allRoles has 'Viewer', use 'Viewer'.
+  // Otherwise, if allRoles has items, use the first one.
+  // Otherwise (allRoles is empty), use undefined (so placeholder shows).
+  let determinedDefaultRole: string | undefined = undefined;
+  if (initialData?.role) {
+    determinedDefaultRole = initialData.role;
+  } else if (allRoles.length > 0) {
+    if (allRoles.includes('Viewer')) {
+      determinedDefaultRole = 'Viewer';
+    } else {
+      determinedDefaultRole = allRoles[0];
+    }
+  }
+
 
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, reset } = useForm<UserFormValues>({
     resolver: zodResolver(currentFormSchema),
-    defaultValues: { // Set initial default values
-      name: '',
-      email: '',
-      role: allRoles.includes('Viewer') ? 'Viewer' : allRoles[0] || '', // Default role
-      password: '', // Password will be empty by default
+    defaultValues: {
+      name: initialData?.name || '',
+      email: initialData?.email || '',
+      role: determinedDefaultRole,
+      password: '',
     },
   });
 
   useEffect(() => {
-    if (initialData && !isNewUserFlow) { // Editing existing user
+    // Recalculate default role for reset, similar to above logic
+    let defaultRoleForReset: string | undefined = undefined;
+    if (initialData?.role) {
+        defaultRoleForReset = initialData.role;
+    } else if (allRoles.length > 0) {
+        if (allRoles.includes('Viewer')) {
+        defaultRoleForReset = 'Viewer';
+        } else {
+        defaultRoleForReset = allRoles[0];
+        }
+    }
+
+    if (initialData && !isNewUserFlow) {
       reset({
         name: initialData.name || '',
         email: initialData.email || '',
-        role: initialData.role || (allRoles.includes('Viewer') ? 'Viewer' : allRoles[0] || ''),
-        // Password field is not part of initialData for editing, and not shown
+        role: defaultRoleForReset,
       });
-    } else if (isNewUserFlow) { // Creating a new user
-        reset({ // Reset to fresh defaults for new user
+    } else if (isNewUserFlow) {
+        reset({
             name: '',
             email: '',
-            role: allRoles.includes('Viewer') ? 'Viewer' : allRoles[0] || '',
+            role: defaultRoleForReset, // Use the same logic for new users
             password: '',
         });
     }
@@ -71,7 +97,7 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
 
 
   const handleFormSubmit = (values: UserFormValues) => {
-    // The onSubmit prop will handle if it's a new user or an edit based on isNewUserFlow
+    // Zod schema ensures role is a non-empty string if submitted.
     return onSubmit(values, isNewUserFlow);
   };
 
@@ -85,13 +111,12 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
 
       <div>
         <Label htmlFor="email">Email Address</Label>
-        <Input 
-          id="email" 
-          type="email" 
-          {...register("email")} 
-          placeholder="user@example.com" 
-          // Disable email editing for existing users as it's tied to Firebase Auth identity
-          disabled={!isNewUserFlow && !!initialData} 
+        <Input
+          id="email"
+          type="email"
+          {...register("email")}
+          placeholder="user@example.com"
+          disabled={!isNewUserFlow && !!initialData}
         />
         {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
         {!isNewUserFlow && !!initialData && (
@@ -99,7 +124,7 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
         )}
       </div>
 
-      {isNewUserFlow && ( // Only show password field for new users
+      {isNewUserFlow && (
         <div>
           <Label htmlFor="password">Initial Password</Label>
           <Input id="password" type="password" {...register("password")} placeholder="Set an initial password" />
@@ -113,21 +138,25 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
           name="role"
           control={control}
           render={({ field }) => (
-            <Select 
-              onValueChange={field.onChange} 
-              value={field.value} // Ensure value is controlled
-              defaultValue={field.value} // Set defaultValue for initial render
+            <Select
+              onValueChange={field.onChange}
+              // If field.value is undefined (e.g. initially when no roles and no initialData),
+              // passing '' to Select value allows placeholder to show.
+              value={field.value || ''}
             >
               <SelectTrigger id="role">
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
                 {allRoles.length > 0 ? (
-                  allRoles.map(roleName => ( // Changed variable name for clarity
-                    <SelectItem key={roleName} value={roleName}>{roleName}</SelectItem>
+                  allRoles.map(roleName => (
+                    // Zod schema for role name should prevent roleName from being empty.
+                    // key and value must be non-empty strings.
+                    roleName ? <SelectItem key={roleName} value={roleName}>{roleName}</SelectItem> : null
                   ))
                 ) : (
-                  <SelectItem value="" disabled>No roles available</SelectItem>
+                  // Display a message if no roles are available. Do NOT use SelectItem with value="".
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">No roles available</div>
                 )}
               </SelectContent>
             </Select>
@@ -135,7 +164,7 @@ export function UserForm({ onSubmit, initialData, allRoles, onCancel, isNewUserF
         />
         {errors.role && <p className="text-sm text-destructive mt-1">{errors.role.message}</p>}
       </div>
-      
+
       <div className="flex justify-end gap-2 pt-4">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancel
