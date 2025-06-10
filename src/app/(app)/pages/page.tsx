@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PlusCircle, Search, MoreHorizontal, Edit2, Copy, Trash2, Eye, Loader2 } from "lucide-react";
+import { PlusCircle, Search, MoreHorizontal, Edit2, Copy, Trash2, Eye, Loader2, ExternalLink } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -145,6 +145,8 @@ export default function PagesManagementPage() {
           content: data.content || {},
         };
 
+        // This switch ensures the 'content' field is correctly typed based on 'pageType'
+        // For 'generic' pageType, content can be flexible. For others, it should match the specific schema.
         switch (baseData.pageType) {
           case 'home':
             return { ...baseData, content: data.content || {} } as HomePage;
@@ -164,8 +166,8 @@ export default function PagesManagementPage() {
             return { ...baseData, content: data.content || {} } as IndividualCentrePage;
           case 'enquiry':
             return { ...baseData, content: data.content || {} } as EnquiryPage;
-          default:
-            return { ...baseData, content: data.content || {} } as GenericPage;
+          default: // 'generic' or any unknown pageType
+            return { ...baseData, content: data.content || { mainContent: ''} } as GenericPage;
         }
       });
       setPages(pagesData);
@@ -195,26 +197,39 @@ export default function PagesManagementPage() {
     setEditingPage(page);
     setIsFormOpen(true);
   };
+  
+  const handlePreviewPage = (page: Page) => {
+    let previewSlug = page.slug;
+    if (page.pageType === 'home' && (!page.slug || page.slug === 'home')) {
+        previewSlug = 'home'; // Special case for homepage preview
+    }
+    if (!previewSlug) {
+        toast({ title: "Preview Error", description: "Page slug is missing, cannot generate preview link.", variant: "destructive" });
+        return;
+    }
+    window.open(`/preview/${previewSlug}`, '_blank');
+  };
+
 
   const handleFormSubmit = async (values: PageFormValues, pageType: PageType, contentData?: any) => {
     try {
       const dataToSave: any = {
-        ...values, // title, slug, status, author, pageType from PageFormValues
+        ...values, 
         content: contentData || {},
         updatedAt: serverTimestamp(),
-        // author is already part of 'values' from the form (defaulted to current user)
+        author: values.author || userData?.name || user?.email || 'Admin',
       };
 
       if (editingPage) {
         const pageRef = doc(db, "pages", editingPage.id);
-        if (editingPage.createdAt) {
+        if (editingPage.createdAt) { // Preserve original creation timestamp
             dataToSave.createdAt = editingPage.createdAt; 
-        } else if (!dataToSave.createdAt) { // Only set if not already present (e.g. from form values if it was a field)
-             dataToSave.createdAt = serverTimestamp(); // Should only happen if it was a new page somehow without createdAt
+        } else if (!dataToSave.createdAt) { 
+             dataToSave.createdAt = serverTimestamp(); 
         }
 
         await updateDoc(pageRef, dataToSave);
-        await logAuditEvent(user, userData, 'PAGE_UPDATED', 'Page', editingPage.id, values.title, { newValues: values, newContent: contentData });
+        await logAuditEvent(user, userData, 'PAGE_UPDATED', 'Page', editingPage.id, values.title, { newValues: values, newContentSummary: Object.keys(contentData || {}).join(', ') });
         toast({
           title: "Success",
           description: "Page updated successfully.",
@@ -222,7 +237,7 @@ export default function PagesManagementPage() {
       } else {
         dataToSave.createdAt = serverTimestamp();
         const newDocRef = await addDoc(collection(db, "pages"), dataToSave);
-        await logAuditEvent(user, userData, 'PAGE_CREATED', 'Page', newDocRef.id, values.title, { values, content: contentData });
+        await logAuditEvent(user, userData, 'PAGE_CREATED', 'Page', newDocRef.id, values.title, { values, contentSummary: Object.keys(contentData || {}).join(', ') });
         toast({
           title: "Success",
           description: "Page created successfully.",
@@ -331,8 +346,8 @@ export default function PagesManagementPage() {
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">{page.lastModified}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" className="mr-2" onClick={() => alert('Preview: Intended public URL: /' + (page.pageType === 'home' && !page.slug ? '' : page.slug))}>
-                        <Eye className="h-4 w-4 mr-1" /> Preview
+                      <Button variant="outline" size="sm" className="mr-2" onClick={() => handlePreviewPage(page)}>
+                        <ExternalLink className="h-4 w-4 mr-1" /> Data Preview
                       </Button>
                       {user && ( 
                         <DropdownMenu>
@@ -387,7 +402,7 @@ export default function PagesManagementPage() {
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
           setIsFormOpen(isOpen);
-          if (!isOpen) { // When dialog closes for any reason
+          if (!isOpen) { 
             setEditingPage(null); 
           }
       }}>
@@ -398,9 +413,9 @@ export default function PagesManagementPage() {
               {editingPage ? "Make changes to your page here." : "Fill in the details for your new page."} Click save when you're done.
             </DialogDescription>
           </DialogHeader>
-          {isFormOpen && ( // Conditionally render PageForm only when dialog is open
+          {isFormOpen && ( 
             <PageForm
-              key={editingPage ? `edit-${editingPage.id}` : 'create-new-page'} // More distinct key
+              key={editingPage ? `edit-${editingPage.id}-${editingPage.pageType}` : `create-new-page-${Date.now()}`}
               onSubmit={handleFormSubmit}
               initialData={editingPage}
               onCancel={() => {

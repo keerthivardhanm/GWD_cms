@@ -7,10 +7,10 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Bug, Loader2 } from 'lucide-react';
+import { ShieldCheck, Loader2, Mail, Lock } from 'lucide-react'; // Changed Bug to ShieldCheck, added Mail, Lock
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/context/AuthContext';
 import { useEffect } from 'react';
@@ -39,69 +39,80 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormValues) => {
     try {
       await login(data.email, data.password);
-      // Successful login will trigger onAuthStateChanged, and useEffect will redirect
     } catch (error) {
-      // Error is handled by toast in AuthContext, form remains usable
       console.error("Login page caught error:", error);
     }
   };
 
-  if (authLoading && !user) { // Show loading spinner only if not logged in yet but auth is processing
+  if (authLoading && !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
 
-  // If user is already available (e.g. from previous session, and no longer loading), redirect immediately
   if (user && !authLoading) {
-     // This part should ideally not be reached if useEffect works correctly, but as a fallback.
     return (
-        <div className="flex min-h-screen items-center justify-center bg-background p-4">
-            <p>Redirecting to dashboard...</p>
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
+            <p className="text-white">Redirecting to dashboard...</p>
         </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="text-center">
-          <Bug className="mx-auto h-12 w-12 text-primary mb-4" />
-          <CardTitle className="text-3xl font-bold font-headline">{APP_NAME} Login</CardTitle>
-          <CardDescription>Enter your credentials to access your account.</CardDescription>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 p-4 selection:bg-primary/20">
+      <div className="mb-8 text-center">
+        <ShieldCheck className="mx-auto h-16 w-16 text-primary mb-4" />
+        <h1 className="text-4xl font-bold text-foreground font-headline tracking-tight">Welcome to {APP_NAME}</h1>
+        <p className="text-muted-foreground">Sign in to continue to your dashboard.</p>
+      </div>
+      <Card className="w-full max-w-sm shadow-2xl overflow-hidden border-none">
+        <CardHeader className="bg-slate-50 dark:bg-slate-800/50 p-6">
+          <CardTitle className="text-2xl font-semibold">Login</CardTitle>
+          <CardDescription>Enter your credentials below.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6 space-y-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="admin@example.com" {...register("email")} />
+              <Label htmlFor="email">Email Address</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input id="email" type="email" placeholder="you@example.com" {...register("email")} className="pl-10" />
+              </div>
               {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <Link href="#" className="text-sm text-primary hover:underline">
+                <Link href="#" className="text-sm text-primary hover:underline font-medium">
                   Forgot password?
                 </Link>
               </div>
-              <Input id="password" type="password" {...register("password")} />
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input id="password" type="password" placeholder="••••••••" {...register("password")} className="pl-10"/>
+              </div>
               {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
             </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting || authLoading}>
+            <Button type="submit" className="w-full text-base py-3" disabled={isSubmitting || authLoading}>
               {isSubmitting || authLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Login
+              Sign In
             </Button>
           </form>
-          <div className="mt-6 text-center text-sm">
-            Don&apos;t have an account?{' '}
-            <Link href="#" className="text-primary hover:underline">
-              Sign up
-            </Link>
-          </div>
         </CardContent>
+        <CardFooter className="p-6 bg-slate-50 dark:bg-slate-800/50 border-t dark:border-slate-700/50">
+          <p className="text-sm text-muted-foreground text-center w-full">
+            Don&apos;t have an account?{' '}
+            <Link href="#" className="font-medium text-primary hover:underline">
+              Contact Support
+            </Link>
+          </p>
+        </CardFooter>
       </Card>
+      <p className="mt-8 text-xs text-muted-foreground">
+        &copy; {new Date().getFullYear()} {APP_NAME}. Secure & Reliable.
+      </p>
     </div>
   );
 }

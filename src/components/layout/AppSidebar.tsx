@@ -1,10 +1,10 @@
 
 "use client";
 
-import React from "react"; // Ensure React is imported
+import React from "react"; 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bug, LogOut, Settings2, UserCircle } from "lucide-react";
+import { ShieldCheck, LogOut, Settings2, UserCircle } from "lucide-react"; // Changed Bug to ShieldCheck
 
 import { NAV_ITEMS, APP_NAME, type NavItem } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useAuth } from "@/context/AuthContext"; 
 
 
 const SidebarMenuItemContent = ({ item, currentPath }: { item: NavItem; currentPath: string }) => {
@@ -69,7 +69,7 @@ const SidebarMenuItemContent = ({ item, currentPath }: { item: NavItem; currentP
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { user, userData, logout } = useAuth(); // Get user and logout function
+  const { user, userData, logout } = useAuth(); 
 
   const getInitials = (nameOrEmail?: string | null) => {
     if (!nameOrEmail) return "AU";
@@ -88,11 +88,9 @@ export function AppSidebar() {
   const renderNavItems = (items: NavItem[]) => {
     return items.map((item, index) => {
       if (item.groupLabel) {
-        // This is a group, render its subItems
         return (
           <SidebarGroup key={`group-${item.groupLabel}-${index}`}>
             <SidebarGroupLabel className="flex items-center gap-2">
-              {/* <item.icon /> */}
               {item.groupLabel}
             </SidebarGroupLabel>
             {item.subItems && item.subItems.length > 0 && (
@@ -108,7 +106,6 @@ export function AppSidebar() {
         );
       }
       
-      // Regular item or item with sub-items (collapsible)
       return (
         <SidebarMenuItem key={`${item.href}-${index}`}>
           <SidebarMenuItemContent item={item} currentPath={pathname} />
@@ -136,7 +133,7 @@ export function AppSidebar() {
     <Sidebar variant="sidebar" collapsible="icon" className="shadow-md">
       <SidebarHeader className="border-b border-sidebar-border">
         <Link href="/dashboard" className="flex items-center gap-2 py-2">
-          <Bug className="h-7 w-7 text-primary" />
+          <ShieldCheck className="h-7 w-7 text-primary" />
           <span className="text-xl font-semibold tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden">
             {APP_NAME}
           </span>
