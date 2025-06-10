@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,15 +24,16 @@ export interface ContentBlock {
   name: string;
   type: ContentBlockType;
   status: ContentBlockStatus; 
-  content: string; // For simple text content, can be expanded later
-  version?: number; // Optional for now
-  lastModified?: string; // Display string
+  content: string; 
+  version?: number; 
+  lastModified?: string; 
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
 
 export default function ContentBlocksPage() {
-  const [contentBlocks, setContentBlocks] = useState<ContentBlock[]>([]);
+  const [allContentBlocks, setAllContentBlocks] = useState<ContentBlock[]>([]);
+  const [filteredContentBlocks, setFilteredContentBlocks] = useState<ContentBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -40,6 +41,7 @@ export default function ContentBlocksPage() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
 
   const fetchContentBlocks = useCallback(async () => {
@@ -62,7 +64,8 @@ export default function ContentBlocksPage() {
           updatedAt: data.updatedAt,
         } as ContentBlock;
       });
-      setContentBlocks(blocksData);
+      setAllContentBlocks(blocksData);
+      setFilteredContentBlocks(blocksData);
     } catch (err) {
       console.error("Error fetching content blocks:", err);
       setError("Failed to load content blocks. Please ensure the 'contentBlocks' collection exists and has data.");
@@ -75,6 +78,16 @@ export default function ContentBlocksPage() {
   useEffect(() => {
     fetchContentBlocks();
   }, [fetchContentBlocks]);
+
+  useEffect(() => {
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    const filtered = allContentBlocks.filter(block => 
+      block.name.toLowerCase().includes(lowerSearchTerm) ||
+      block.type.toLowerCase().includes(lowerSearchTerm) ||
+      block.status.toLowerCase().includes(lowerSearchTerm)
+    );
+    setFilteredContentBlocks(filtered);
+  }, [searchTerm, allContentBlocks]);
 
   const handleAddNewBlock = () => {
     setEditingBlock(null);
@@ -102,7 +115,7 @@ export default function ContentBlocksPage() {
         const newDocRef = await addDoc(collection(db, "contentBlocks"), {
           ...dataToSave,
           createdAt: serverTimestamp(),
-          version: 1, // Initial version
+          version: 1, 
         });
         await logAuditEvent(user, userData, 'CONTENT_BLOCK_CREATED', 'ContentBlock', newDocRef.id, values.name, { values });
         toast({ title: "Success", description: "Content block created successfully." });
@@ -146,6 +159,13 @@ export default function ContentBlocksPage() {
     }
   };
 
+  const NoBlocksMessage = () => {
+    if (searchTerm && filteredContentBlocks.length === 0 && allContentBlocks.length > 0) {
+        return `No content blocks found matching "${searchTerm}".`;
+    }
+    return "No content blocks found. Click \"Add New Block\" to create one.";
+  };
+
 
   return (
     <div className="space-y-6">
@@ -153,15 +173,21 @@ export default function ContentBlocksPage() {
         title="Content Blocks"
         description="Manage individual content blocks and their versions."
         actions={
-          <>
-            <div className="relative">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input type="search" placeholder="Search blocks..." className="pl-8 sm:w-[300px]" />
+              <Input 
+                type="search" 
+                placeholder="Search blocks..." 
+                className="pl-8 sm:w-[250px] md:w-[300px] w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-            <Button onClick={handleAddNewBlock}>
+            <Button onClick={handleAddNewBlock} className="w-full sm:w-auto">
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Block
             </Button>
-          </>
+          </div>
         }
       />
 
@@ -174,10 +200,17 @@ export default function ContentBlocksPage() {
             </div>
         )}
         {error && <p className="p-4 text-center text-destructive">{error}</p>}
-        {!loading && !error && contentBlocks.length === 0 && (
-            <p className="p-4 text-center text-muted-foreground">No content blocks found. Click "Add New Block" to create one.</p>
+        {!loading && !error && allContentBlocks.length === 0 && (
+            <p className="p-4 text-center text-muted-foreground">
+                No content blocks found. Click "Add New Block" to create one.
+            </p>
         )}
-        {!loading && !error && contentBlocks.length > 0 && (
+         {!loading && !error && allContentBlocks.length > 0 && filteredContentBlocks.length === 0 && (
+            <p className="p-4 text-center text-muted-foreground">
+              <NoBlocksMessage />
+            </p>
+        )}
+        {!loading && !error && filteredContentBlocks.length > 0 && (
             <Table>
                 <TableHeader>
                 <TableRow>
@@ -189,7 +222,7 @@ export default function ContentBlocksPage() {
                 </TableRow>
                 </TableHeader>
                 <TableBody>
-                {contentBlocks.map((block) => (
+                {filteredContentBlocks.map((block) => (
                     <TableRow key={block.id}>
                     <TableCell className="font-medium">{block.name}</TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">{block.type}</TableCell>
@@ -219,17 +252,6 @@ export default function ContentBlocksPage() {
                                 {block.status === "Published" ? <ToggleLeft className="mr-2 h-4 w-4" /> : <ToggleRight className="mr-2 h-4 w-4" />}
                                 Set to {block.status === "Published" ? "Draft" : "Published"}
                             </DropdownMenuItem>
-                             {/* Placeholder for future actions 
-                            <DropdownMenuItem disabled>
-                                <Settings className="mr-2 h-4 w-4" /> Configure Block
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled>
-                                <Copy className="mr-2 h-4 w-4" /> Duplicate Block
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled>
-                                <History className="mr-2 h-4 w-4" /> View Version History
-                            </DropdownMenuItem>
-                            */}
                             <DropdownMenuSeparator />
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>

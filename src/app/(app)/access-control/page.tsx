@@ -1,21 +1,21 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { PlusCircle, MoreHorizontal, Edit2, Trash2, UserPlus, Shield, Users, Loader2 } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Edit2, Trash2, UserPlus, Shield, Users, Loader2, Search } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { auth, db } from '@/lib/firebase';
-import { createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'; // Added sendPasswordResetEmail
+import { createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { collection, getDocs, QueryDocumentSnapshot, DocumentData, Timestamp, addDoc, updateDoc, deleteDoc, doc, setDoc, serverTimestamp, query, orderBy, getDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { UserForm, UserFormValues, UserRole } from '@/components/forms/UserForm';
@@ -52,7 +52,6 @@ export const allPermissions = [
     { id: "view_audit_logs", label: "View Audit Logs" },
 ];
 
-// Helper function to generate a random password (for temporary use)
 const generateRandomPassword = (length = 16): string => {
   const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=";
   let retVal = "";
@@ -64,7 +63,8 @@ const generateRandomPassword = (length = 16): string => {
 
 
 export default function AccessControlPage() {
-  const [users, setUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [loadingRoles, setLoadingRoles] = useState(true);
@@ -79,6 +79,7 @@ export default function AccessControlPage() {
 
   const [isRoleFormOpen, setIsRoleFormOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [userSearchTerm, setUserSearchTerm] = useState("");
 
   const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
@@ -98,7 +99,8 @@ export default function AccessControlPage() {
           updatedAt: data.updatedAt,
         } as User;
       });
-      setUsers(usersData);
+      setAllUsers(usersData);
+      setFilteredUsers(usersData);
     } catch (err) {
       console.error("Error fetching users:", err);
       setErrorUsers("Failed to load users. Please try again later.");
@@ -140,6 +142,17 @@ export default function AccessControlPage() {
     fetchRoles();
   }, [fetchUsers, fetchRoles]);
 
+  useEffect(() => {
+    const lowerSearchTerm = userSearchTerm.toLowerCase();
+    const filtered = allUsers.filter(user =>
+      user.name.toLowerCase().includes(lowerSearchTerm) ||
+      user.email.toLowerCase().includes(lowerSearchTerm) ||
+      (typeof user.role === 'string' && user.role.toLowerCase().includes(lowerSearchTerm))
+    );
+    setFilteredUsers(filtered);
+  }, [userSearchTerm, allUsers]);
+
+
   const handleInviteNewUser = () => {
     setEditingUser(null); 
     setIsNewUserFlow(true); 
@@ -154,14 +167,12 @@ export default function AccessControlPage() {
 
   const handleUserFormSubmit = async (values: UserFormValues, isNew: boolean) => {
     try {
-      if (isNew) { // Creating a new user
-        const randomPassword = generateRandomPassword(); // Generate a random password
+      if (isNew) { 
+        const randomPassword = generateRandomPassword(); 
         
-        // 1. Create Firebase Auth user with the random password
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, randomPassword);
         const newAuthUser = userCredential.user;
 
-        // 2. Create Firestore user profile
         const userProfileData = {
           name: values.name,
           email: values.email,
@@ -171,18 +182,16 @@ export default function AccessControlPage() {
         };
         await setDoc(doc(db, "users", newAuthUser.uid), userProfileData);
         
-        // 3. Send password reset email
         await sendPasswordResetEmail(auth, values.email);
         
         await logAuditEvent(authUser, authUserData, 'USER_CREATED', 'User', newAuthUser.uid, values.name, { name: values.name, email: values.email, role: values.role });
         toast({ title: "User Created", description: `User ${values.email} created successfully. A password reset email has been sent to them.` });
         
-      } else if (editingUser) { // Editing an existing user
+      } else if (editingUser) { 
         const userRef = doc(db, "users", editingUser.id);
         const updateData = {
           name: values.name,
           role: values.role,
-          // email: values.email, // Email change is disabled in form for existing users
           updatedAt: serverTimestamp(),
         };
         await updateDoc(userRef, updateData);
@@ -198,9 +207,6 @@ export default function AccessControlPage() {
       let errorMessage = `Failed to save user. ${err.message || ''}`;
       if (err.code === 'auth/email-already-in-use') {
         errorMessage = "This email address is already in use by another Auth account.";
-      } else if (err.code === 'auth/weak-password') {
-        // This should not happen with random password, but good to keep if admin could set it
-        errorMessage = "The password is too weak (must be at least 6 characters).";
       }
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
     }
@@ -212,8 +218,6 @@ export default function AccessControlPage() {
         return;
     }
     try {
-      // Note: This only deletes the Firestore profile. 
-      // Deleting the Firebase Auth user requires Admin SDK (Cloud Function).
       await deleteDoc(doc(db, "users", userId));
       await logAuditEvent(authUser, authUserData, 'USER_DELETED', 'User', userId, userName);
       toast({ title: "User Profile Removed", description: `User profile "${userName}" removed from Firestore. Firebase Auth account may still exist.` });
@@ -263,7 +267,7 @@ export default function AccessControlPage() {
   };
 
   const handleDeleteRole = async (roleId: string, roleName: string) => {
-    const usersWithRole = users.filter(user => user.role === roleName);
+    const usersWithRole = allUsers.filter(user => user.role === roleName);
     if (usersWithRole.length > 0) {
         toast({ title: "Cannot Delete Role", description: `Role "${roleName}" is currently assigned to ${usersWithRole.length} user(s). Reassign users before deleting.`, variant: "destructive"});
         return;
@@ -284,6 +288,13 @@ export default function AccessControlPage() {
     }
   };
 
+  const NoUsersMessage = () => {
+    if (userSearchTerm && filteredUsers.length === 0 && allUsers.length > 0) {
+        return `No users found matching "${userSearchTerm}".`;
+    }
+    return "No users found. Click \"Invite New User\" to add one.";
+  };
+
 
   return (
     <div className="space-y-6">
@@ -291,10 +302,10 @@ export default function AccessControlPage() {
         title="Access Control"
         description="Manage user accounts, roles, and their permissions."
         actions={
-          <>
-            <Button variant="outline" onClick={handleInviteNewUser}> <UserPlus className="mr-2 h-4 w-4" /> Invite New User</Button>
-            <Button onClick={handleCreateNewRole}> <PlusCircle className="mr-2 h-4 w-4" /> Create New Role</Button>
-          </>
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <Button variant="outline" onClick={handleInviteNewUser} className="w-full sm:w-auto"> <UserPlus className="mr-2 h-4 w-4" /> Invite New User</Button>
+            <Button onClick={handleCreateNewRole} className="w-full sm:w-auto"> <PlusCircle className="mr-2 h-4 w-4" /> Create New Role</Button>
+          </div>
         }
       />
 
@@ -306,7 +317,16 @@ export default function AccessControlPage() {
             </CardHeader>
             <CardContent className="p-0">
             <div className="p-4 border-b">
-                <Input type="search" placeholder="Search users by name or email..." className="w-full" />
+                <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        type="search" 
+                        placeholder="Search users by name or email..." 
+                        className="w-full pl-8" 
+                        value={userSearchTerm}
+                        onChange={(e) => setUserSearchTerm(e.target.value)}
+                    />
+                </div>
             </div>
             {loadingUsers && (
                 <div className="flex items-center justify-center p-10">
@@ -315,10 +335,13 @@ export default function AccessControlPage() {
                 </div>
             )}
             {errorUsers && <p className="p-4 text-center text-destructive">{errorUsers}</p>}
-            {!loadingUsers && !errorUsers && users.length === 0 && (
+            {!loadingUsers && !errorUsers && allUsers.length === 0 && (
                 <p className="p-4 text-center text-muted-foreground">No users found. Click "Invite New User" to add one.</p>
             )}
-            {!loadingUsers && !errorUsers && users.length > 0 && (
+             {!loadingUsers && !errorUsers && allUsers.length > 0 && filteredUsers.length === 0 && (
+                <p className="p-4 text-center text-muted-foreground"><NoUsersMessage /></p>
+            )}
+            {!loadingUsers && !errorUsers && filteredUsers.length > 0 && (
                 <Table>
                     <TableHeader>
                     <TableRow>
@@ -329,7 +352,7 @@ export default function AccessControlPage() {
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {users.map((user) => (
+                    {filteredUsers.map((user) => (
                         <TableRow key={user.id}>
                         <TableCell className="font-medium">{user.name}</TableCell>
                         <TableCell className="hidden sm:table-cell text-muted-foreground">{user.email}</TableCell>
@@ -421,7 +444,7 @@ export default function AccessControlPage() {
                                         <DropdownMenuItem 
                                             onSelect={(e) => e.preventDefault()} 
                                             className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                            disabled={['Admin', 'Editor', 'Viewer'].includes(role.name) || users.some(u => u.role === role.name)}
+                                            disabled={['Admin', 'Editor', 'Viewer'].includes(role.name) || allUsers.some(u => u.role === role.name)}
                                         >
                                             <Trash2 className="mr-2 h-4 w-4" /> Delete Role
                                         </DropdownMenuItem>

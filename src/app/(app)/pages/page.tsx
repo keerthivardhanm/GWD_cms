@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,7 +110,8 @@ export type Page =
 
 
 export default function PagesManagementPage() {
-  const [pages, setPages] = useState<Page[]>([]);
+  const [allPages, setAllPages] = useState<Page[]>([]);
+  const [filteredPages, setFilteredPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -118,6 +119,7 @@ export default function PagesManagementPage() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPage, setEditingPage] = useState<Page | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
 
   const fetchPages = useCallback(async () => {
@@ -145,8 +147,6 @@ export default function PagesManagementPage() {
           content: data.content || {},
         };
 
-        // This switch ensures the 'content' field is correctly typed based on 'pageType'
-        // For 'generic' pageType, content can be flexible. For others, it should match the specific schema.
         switch (baseData.pageType) {
           case 'home':
             return { ...baseData, content: data.content || {} } as HomePage;
@@ -166,11 +166,12 @@ export default function PagesManagementPage() {
             return { ...baseData, content: data.content || {} } as IndividualCentrePage;
           case 'enquiry':
             return { ...baseData, content: data.content || {} } as EnquiryPage;
-          default: // 'generic' or any unknown pageType
+          default: 
             return { ...baseData, content: data.content || { mainContent: ''} } as GenericPage;
         }
       });
-      setPages(pagesData);
+      setAllPages(pagesData);
+      setFilteredPages(pagesData); 
     } catch (err) {
       console.error("Error fetching pages:", err);
       setError("Failed to load pages. Please ensure the 'pages' collection exists and try again.");
@@ -188,6 +189,17 @@ export default function PagesManagementPage() {
     fetchPages();
   }, [fetchPages]);
 
+  useEffect(() => {
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    const filtered = allPages.filter(page => 
+      page.title.toLowerCase().includes(lowerSearchTerm) ||
+      page.slug.toLowerCase().includes(lowerSearchTerm) ||
+      page.pageType.toLowerCase().includes(lowerSearchTerm) ||
+      page.author.toLowerCase().includes(lowerSearchTerm)
+    );
+    setFilteredPages(filtered);
+  }, [searchTerm, allPages]);
+
   const handleCreateNewPage = () => {
     setEditingPage(null);
     setIsFormOpen(true);
@@ -201,7 +213,7 @@ export default function PagesManagementPage() {
   const handlePreviewPage = (page: Page) => {
     let previewSlug = page.slug;
     if (page.pageType === 'home' && (!page.slug || page.slug === 'home')) {
-        previewSlug = 'home'; // Special case for homepage preview
+        previewSlug = 'home'; 
     }
     if (!previewSlug) {
         toast({ title: "Preview Error", description: "Page slug is missing, cannot generate preview link.", variant: "destructive" });
@@ -222,7 +234,7 @@ export default function PagesManagementPage() {
 
       if (editingPage) {
         const pageRef = doc(db, "pages", editingPage.id);
-        if (editingPage.createdAt) { // Preserve original creation timestamp
+        if (editingPage.createdAt) { 
             dataToSave.createdAt = editingPage.createdAt; 
         } else if (!dataToSave.createdAt) { 
              dataToSave.createdAt = serverTimestamp(); 
@@ -280,6 +292,9 @@ export default function PagesManagementPage() {
   };
 
   const NoPagesMessage = () => {
+    if (searchTerm && filteredPages.length === 0 && allPages.length > 0) {
+        return `No pages found matching "${searchTerm}".`;
+    }
     return "No pages found. Click \"Create New Page\" to get started.";
   };
 
@@ -289,13 +304,19 @@ export default function PagesManagementPage() {
         title="Page Management"
         description="Create, edit, and manage your website pages."
         actions={
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input type="search" placeholder="Search pages..." className="pl-8 sm:w-[300px]" />
+              <Input 
+                type="search" 
+                placeholder="Search pages..." 
+                className="pl-8 sm:w-[250px] md:w-[300px] w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
             {user && ( 
-                <Button onClick={handleCreateNewPage}>
+                <Button onClick={handleCreateNewPage} className="w-full sm:w-auto">
                 <PlusCircle className="mr-2 h-4 w-4" /> Create New Page
                 </Button>
             )}
@@ -312,12 +333,17 @@ export default function PagesManagementPage() {
             </div>
           )}
           {error && <p className="p-4 text-center text-destructive">{error}</p>}
-          {!loading && !error && pages.length === 0 && (
+          {!loading && !error && allPages.length === 0 && (
+            <p className="p-4 text-center text-muted-foreground">
+              No pages found. Click "Create New Page" to get started.
+            </p>
+          )}
+           {!loading && !error && allPages.length > 0 && filteredPages.length === 0 && (
             <p className="p-4 text-center text-muted-foreground">
               <NoPagesMessage />
             </p>
           )}
-          {!loading && !error && pages.length > 0 && (
+          {!loading && !error && filteredPages.length > 0 && (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -330,7 +356,7 @@ export default function PagesManagementPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pages.map((page) => (
+                {filteredPages.map((page) => (
                   <TableRow key={page.id}>
                     <TableCell className="font-medium">{page.title}</TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">{page.slug}</TableCell>

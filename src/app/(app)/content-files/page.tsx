@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,14 +17,16 @@ interface ContentFile {
   name: string;
   attachedTo: string;
   blocks: number;
-  lastUpdated: string; // Display string
+  lastUpdated: string; 
   versions: number;
 }
 
 export default function ContentFilesPage() {
-  const [contentFiles, setContentFiles] = useState<ContentFile[]>([]);
+  const [allContentFiles, setAllContentFiles] = useState<ContentFile[]>([]);
+  const [filteredContentFiles, setFilteredContentFiles] = useState<ContentFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const fetchContentFiles = async () => {
@@ -43,7 +45,8 @@ export default function ContentFilesPage() {
             versions: data.versions || 1,
           } as ContentFile;
         });
-        setContentFiles(filesData);
+        setAllContentFiles(filesData);
+        setFilteredContentFiles(filesData);
       } catch (err) {
         console.error("Error fetching content files:", err);
         setError("Failed to load content files. Please ensure the 'contentFiles' collection exists and has data.");
@@ -55,21 +58,43 @@ export default function ContentFilesPage() {
     fetchContentFiles();
   }, []);
 
+  useEffect(() => {
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    const filtered = allContentFiles.filter(file => 
+      file.name.toLowerCase().includes(lowerSearchTerm) ||
+      file.attachedTo.toLowerCase().includes(lowerSearchTerm)
+    );
+    setFilteredContentFiles(filtered);
+  }, [searchTerm, allContentFiles]);
+
+  const NoFilesMessage = () => {
+    if (searchTerm && filteredContentFiles.length === 0 && allContentFiles.length > 0) {
+        return `No content files found matching "${searchTerm}".`;
+    }
+    return "No content files found. Click \"Create New File\" to get started.";
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Content Files (Modules)"
         description="Manage reusable content structures and their versions."
         actions={
-          <>
-            <div className="relative">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input type="search" placeholder="Search content files..." className="pl-8 sm:w-[300px]" />
+              <Input 
+                type="search" 
+                placeholder="Search content files..." 
+                className="pl-8 sm:w-[250px] md:w-[300px] w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <PlusCircle className="mr-2 h-4 w-4" /> Create New File
             </Button>
-          </>
+          </div>
         }
       />
 
@@ -82,10 +107,15 @@ export default function ContentFilesPage() {
             </div>
           )}
           {error && <p className="p-4 text-center text-destructive">{error}</p>}
-          {!loading && !error && contentFiles.length === 0 && (
+          {!loading && !error && allContentFiles.length === 0 && (
             <p className="p-4 text-center text-muted-foreground">No content files found.</p>
           )}
-          {!loading && !error && contentFiles.length > 0 && (
+          {!loading && !error && allContentFiles.length > 0 && filteredContentFiles.length === 0 && (
+             <p className="p-4 text-center text-muted-foreground">
+                <NoFilesMessage />
+            </p>
+          )}
+          {!loading && !error && filteredContentFiles.length > 0 && (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -98,7 +128,7 @@ export default function ContentFilesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {contentFiles.map((file) => (
+                {filteredContentFiles.map((file) => (
                   <TableRow key={file.id}>
                     <TableCell className="font-medium">{file.name}</TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">{file.attachedTo}</TableCell>
