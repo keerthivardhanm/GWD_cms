@@ -22,8 +22,8 @@ import { AdmissionsPageContentSchema, ApplicationStepSchema, FaqItemSchema } fro
 import { ContactPageContentSchema } from '@/schemas/pages/contactPageSchema';
 import { ProgramsListingPageContentSchema, ProgramTabSchema, ProgramCardSchema } from '@/schemas/pages/programsListingPageSchema';
 import { IndividualProgramPageContentSchema, StringListItemSchema as IndividualProgramStringListItemSchema } from '@/schemas/pages/individualProgramPageSchema'; 
-import { CentresOverviewPageContentSchema, CentreCardSchema as OverviewCentreCardSchema } from '@/schemas/pages/centresOverviewPageSchema';
-import { IndividualCentrePageContentSchema, CentreFeatureSchema as IndividualCentreFeatureSchema } from '@/schemas/pages/individualCentrePageSchema';
+import { CentresOverviewPageContentSchema, CentreListItemSchema, CentreFacilitySchema } from '@/schemas/pages/centresOverviewPageSchema';
+import { IndividualCentrePageContentSchema, GalleryImageSchema } from '@/schemas/pages/individualCentrePageSchema';
 import { EnquiryPageContentSchema, EnquiryFormFieldSchema } from '@/schemas/pages/enquiryPageSchema';
 
 
@@ -131,9 +131,13 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
   const { fields: careerOpportunitiesFields, append: appendCareerOpportunity, remove: removeCareerOpportunity } = useFieldArray({ control, name: "content.careerOpportunities.careers" });
   const { fields: programFaqsFields, append: appendProgramFaq, remove: removeProgramFaq } = useFieldArray({ control, name: "content.programFaqs.faqs" });
 
-  const { fields: centreCardsFields, append: appendCentreCard, remove: removeCentreCard } = useFieldArray({ control, name: "content.centreCards.centres" });
+  // Old: const { fields: centreCardsFields, append: appendCentreCard, remove: removeCentreCard } = useFieldArray({ control, name: "content.centreCards.centres" });
+  // New for Centres Overview
+  const { fields: centresListFields, append: appendCentresListItem, remove: removeCentresListItem } = useFieldArray({ control, name: "content.centresList" });
   
-  const { fields: centreFeaturesFields, append: appendCentreFeature, remove: removeCentreFeature } = useFieldArray({ control, name: "content.centreInfo.features" });
+  // Field Arrays for Individual Centre Page
+  const { fields: individualCentreFacilitiesFields, append: appendIndividualCentreFacility, remove: removeIndividualCentreFacility } = useFieldArray({ control, name: "content.facilitiesSection.facilities" });
+  const { fields: galleryImageFields, append: appendGalleryImage, remove: removeGalleryImage } = useFieldArray({ control, name: "content.gallery" });
   
   const { fields: enquiryFormFields, append: appendEnquiryFormField, remove: removeEnquiryFormField } = useFieldArray({ control, name: "content.enquiryForm.fields" });
 
@@ -529,7 +533,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                             imgSrc: { label: "Partner Logo URL", type: 'input' }, 
                             alt: { label: "Partner Alt", type: 'input' }, 
                             name: { label: "Partner Name", type: 'input' },
-                            description: { label: "Partner Description", type: 'textarea' } // Added description field
+                            description: { label: "Partner Description", type: 'textarea' } 
                         },
                         () => GlobalPartnerSchema.parse({}), "Partners"
                     )}
@@ -702,37 +706,156 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
         )}
         
         {currentContentType === 'centres' && (
-            <Card className="border-t pt-4 mt-4">
-                <CardHeader><CardTitle className="text-lg">Centres Overview Page Content</CardTitle><CardDescription>Manage content for the Centres Overview page.</CardDescription></CardHeader>
-                <CardContent>
-                    {renderFieldArray(
-                        centreCardsFields, removeCentreCard, () => appendCentreCard(OverviewCentreCardSchema.parse({})), "content.centreCards.centres",
-                        {
-                            name: {label: "Centre Name", type: 'input'}, imgSrc: {label: "Image URL", type: 'input'},
-                            alt: {label: "Image Alt", type: 'input'}, description: {label: "Description", type: 'textarea'},
-                            btnLink: {label: "Details Link", type: 'input'}
-                        },
-                        () => OverviewCentreCardSchema.parse({}), "Centre Cards"
-                    )}
+          <Card className="border-t pt-4 mt-4">
+            <CardHeader><CardTitle className="text-lg">Centres Overview Page Content</CardTitle></CardHeader>
+            <CardContent>
+              <Card className="my-4">
+                <CardHeader><CardTitle className="text-md">Hero Section</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  <div><Label htmlFor="content.heroSection.heading">Heading</Label><Input {...register("content.heroSection.heading")} /></div>
+                  <div><Label htmlFor="content.heroSection.subheading">Subheading</Label><Textarea {...register("content.heroSection.subheading")} /></div>
                 </CardContent>
-            </Card>
+              </Card>
+
+              <Card className="my-4">
+                <CardHeader><CardTitle className="text-md">Centres List</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  {centresListFields.map((centreField, centreIndex) => {
+                    const { fields: facilitiesFields, append: appendFacility, remove: removeFacility } = useFieldArray({
+                      control,
+                      name: `content.centresList.${centreIndex}.facilities`
+                    });
+
+                    return (
+                      <Card key={centreField.id} className="p-4 bg-muted/50 space-y-3">
+                        <div className="flex justify-between items-center">
+                            <h4 className="font-medium text-sm">Centre Item {centreIndex + 1}</h4>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => removeCentresListItem(centreIndex)} className="text-destructive hover:bg-destructive/10">
+                                <Trash2 className="mr-1 h-4 w-4"/> Remove Centre
+                            </Button>
+                        </div>
+                        <div><Label htmlFor={`content.centresList.${centreIndex}.name`}>Centre Name</Label><Input {...register(`content.centresList.${centreIndex}.name`)} /></div>
+                        <div><Label htmlFor={`content.centresList.${centreIndex}.imageSrc`}>Image URL</Label><Input {...register(`content.centresList.${centreIndex}.imageSrc`)} placeholder="https://placehold.co/400x300.png" /></div>
+                        <div><Label htmlFor={`content.centresList.${centreIndex}.imageAlt`}>Image Alt Text</Label><Input {...register(`content.centresList.${centreIndex}.imageAlt`)} /></div>
+                        <div><Label htmlFor={`content.centresList.${centreIndex}.description`}>Description</Label><Textarea {...register(`content.centresList.${centreIndex}.description`)} /></div>
+                        <div><Label htmlFor={`content.centresList.${centreIndex}.address`}>Address</Label><Input {...register(`content.centresList.${centreIndex}.address`)} /></div>
+                        <div><Label htmlFor={`content.centresList.${centreIndex}.phone`}>Phone</Label><Input {...register(`content.centresList.${centreIndex}.phone`)} /></div>
+                        <div><Label htmlFor={`content.centresList.${centreIndex}.email`}>Email</Label><Input {...register(`content.centresList.${centreIndex}.email`)} /></div>
+                        <div><Label htmlFor={`content.centresList.${centreIndex}.detailsButtonText`}>Details Button Text</Label><Input {...register(`content.centresList.${centreIndex}.detailsButtonText`)} /></div>
+                        <div><Label htmlFor={`content.centresList.${centreIndex}.detailsButtonLink`}>Details Button Link (Slug)</Label><Input {...register(`content.centresList.${centreIndex}.detailsButtonLink`)} placeholder="/centres/your-centre-slug" /></div>
+                        
+                        <Card className="my-2 p-3 bg-background/80">
+                          <CardHeader className="p-0 pb-2 flex justify-between items-center">
+                            <CardTitle className="text-sm">Key Facilities for this Centre</CardTitle>
+                            <Button type="button" variant="outline" size="xs" onClick={() => appendFacility(CentreFacilitySchema.parse({}))}>
+                              <PlusCircle className="mr-1 h-3 w-3"/> Add Facility
+                            </Button>
+                          </CardHeader>
+                          <CardContent className="p-0 space-y-2">
+                            {facilitiesFields.map((facilityField, facilityIndex) => (
+                              <Card key={facilityField.id} className="p-2 bg-muted/30 space-y-1">
+                                 <div className="flex justify-between items-center">
+                                   <h5 className="font-medium text-xs">Facility {facilityIndex + 1}</h5>
+                                   <Button type="button" variant="ghost" size="xs" onClick={() => removeFacility(facilityIndex)} className="text-destructive hover:bg-destructive/10">
+                                    <Trash2 className="h-3 w-3"/>
+                                   </Button>
+                                 </div>
+                                <div><Label htmlFor={`content.centresList.${centreIndex}.facilities.${facilityIndex}.iconClass`}>Icon Class/Name</Label><Input {...register(`content.centresList.${centreIndex}.facilities.${facilityIndex}.iconClass`)} placeholder="e.g., fas fa-flask" /></div>
+                                <div><Label htmlFor={`content.centresList.${centreIndex}.facilities.${facilityIndex}.text`}>Facility Text</Label><Input {...register(`content.centresList.${centreIndex}.facilities.${facilityIndex}.text`)} /></div>
+                              </Card>
+                            ))}
+                            {facilitiesFields.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No facilities added yet.</p>}
+                          </CardContent>
+                        </Card>
+                      </Card>
+                    );
+                  })}
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendCentresListItem(CentreListItemSchema.parse({}))}>
+                    <PlusCircle className="mr-1 h-3 w-3"/> Add New Centre Item
+                  </Button>
+                </CardContent>
+              </Card>
+            </CardContent>
+          </Card>
         )}
 
         {currentContentType === 'centre-detail' && (
             <Card className="border-t pt-4 mt-4">
-                <CardHeader><CardTitle className="text-lg">Individual Centre Page Content</CardTitle><CardDescription>Manage content for an Individual Centre page.</CardDescription></CardHeader>
-                <CardContent>
-                    <Card className="my-4"><CardHeader><CardTitle className="text-md">Centre Info</CardTitle></CardHeader>
-                        <CardContent className="space-y-2">
-                            <div><Label htmlFor="content.centreInfo.heading">Heading</Label><Input {...register("content.centreInfo.heading")} /></div>
-                            <div><Label htmlFor="content.centreInfo.paragraph">Paragraph</Label><Textarea {...register("content.centreInfo.paragraph")} /></div>
-                            {renderFieldArray(
-                                centreFeaturesFields, removeCentreFeature, () => appendCentreFeature(IndividualCentreFeatureSchema.parse({})), "content.centreInfo.features",
-                                { icon: {label: "Icon (e.g. lucide:Home)", type: 'input'}, text: {label: "Feature Text", type: 'input'}},
-                                () => IndividualCentreFeatureSchema.parse({}), "Features"
-                            )}
-                        </CardContent>
-                    </Card>
+                <CardHeader><CardTitle className="text-lg">Individual Centre Page Content</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                <Card>
+                    <CardHeader><CardTitle className="text-md">Hero Section</CardTitle></CardHeader>
+                    <CardContent className="space-y-2">
+                    <div><Label htmlFor="content.hero.heading">Hero Heading (Centre Name)</Label><Input {...register("content.hero.heading")} /></div>
+                    <div><Label htmlFor="content.hero.bannerImageSrc">Banner Image URL</Label><Input {...register("content.hero.bannerImageSrc")} placeholder="https://placehold.co/1200x400.png"/></div>
+                    <div><Label htmlFor="content.hero.bannerImageAlt">Banner Image Alt Text</Label><Input {...register("content.hero.bannerImageAlt")} /></div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader><CardTitle className="text-md">Main Centre Details</CardTitle></CardHeader>
+                    <CardContent className="space-y-2">
+                    <div><Label htmlFor="content.name">Centre Name (if different from Hero)</Label><Input {...register("content.name")} /></div>
+                    <div><Label htmlFor="content.description">Description</Label><Textarea {...register("content.description")} rows={5} /></div>
+                    <div><Label htmlFor="content.imageSrc">Main Image URL (optional)</Label><Input {...register("content.imageSrc")} placeholder="https://placehold.co/600x400.png" /></div>
+                    <div><Label htmlFor="content.imageAlt">Main Image Alt Text</Label><Input {...register("content.imageAlt")} /></div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader><CardTitle className="text-md">Contact Information</CardTitle></CardHeader>
+                    <CardContent className="space-y-2">
+                    <div><Label htmlFor="content.contactInfo.address">Address</Label><Input {...register("content.contactInfo.address")} /></div>
+                    <div><Label htmlFor="content.contactInfo.phone">Phone</Label><Input {...register("content.contactInfo.phone")} /></div>
+                    <div><Label htmlFor="content.contactInfo.email">Email</Label><Input {...register("content.contactInfo.email")} /></div>
+                    </CardContent>
+                </Card>
+                
+                <Card>
+                    <CardHeader><CardTitle className="text-md">Facilities Section</CardTitle></CardHeader>
+                    <CardContent className="space-y-2">
+                        <div><Label htmlFor="content.facilitiesSection.heading">Facilities Section Heading</Label><Input {...register("content.facilitiesSection.heading")} placeholder="Key Facilities"/></div>
+                        {renderFieldArray(
+                            individualCentreFacilitiesFields, 
+                            removeIndividualCentreFacility, 
+                            () => appendIndividualCentreFacility(CentreFacilitySchema.parse({})), 
+                            "content.facilitiesSection.facilities",
+                            {
+                                iconClass: { label: "Icon Class/Name", type: 'input', placeholder: "e.g., fas fa-flask" },
+                                text: { label: "Facility Text", type: 'input' },
+                            },
+                            () => CentreFacilitySchema.parse({}), 
+                            "Facilities List" 
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader><CardTitle className="text-md">Image Gallery</CardTitle></CardHeader>
+                    <CardContent>
+                        {renderFieldArray(
+                            galleryImageFields,
+                            removeGalleryImage,
+                            () => appendGalleryImage(GalleryImageSchema.parse({})),
+                            "content.gallery",
+                            {
+                                imgSrc: { label: "Image URL", type: 'input', placeholder: "https://placehold.co/800x600.png" },
+                                alt: { label: "Alt Text", type: 'input' },
+                                caption: { label: "Caption (optional)", type: 'input' },
+                            },
+                            () => GalleryImageSchema.parse({}),
+                            "Gallery Images"
+                        )}
+                    </CardContent>
+                </Card>
+                
+                <Card>
+                    <CardHeader><CardTitle className="text-md">Location Map</CardTitle></CardHeader>
+                    <CardContent>
+                    <div><Label htmlFor="content.mapEmbedUrl">Map Embed URL (iframe src)</Label><Input {...register("content.mapEmbedUrl")} placeholder="Google Maps embed URL" /></div>
+                    </CardContent>
+                </Card>
+
                 </CardContent>
             </Card>
         )}
