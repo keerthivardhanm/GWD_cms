@@ -52,6 +52,13 @@ interface AuditLogEntry {
   timestamp: string;
 }
 
+// Define a type for structured GA errors based on the flow's output
+type GaErrorType = {
+  code: string;
+  message: string;
+} | null;
+
+
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentItems, setRecentItems] = useState<RecentActivityItem[]>([]);
@@ -61,7 +68,7 @@ export default function DashboardPage() {
   const [loadingRecentContent, setLoadingRecentContent] = useState(true);
   const [loadingRecentAuditLogs, setLoadingRecentAuditLogs] = useState(true);
   const [loadingGaData, setLoadingGaData] = useState(true);
-  const [gaError, setGaError] = useState<string | null>(null);
+  const [gaError, setGaError] = useState<string | null>(null); // Store only the message string for UI
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -69,11 +76,12 @@ export default function DashboardPage() {
       setLoadingRecentContent(true);
       setLoadingRecentAuditLogs(true);
       setLoadingGaData(true);
+      setGaError(null); // Reset GA error on new fetch attempt
 
       try {
         // Fetch counts
         const pagesCol = collection(db, "pages");
-        const filesCol = collection(db, "mediaItems"); // Assuming 'mediaItems' for files
+        const filesCol = collection(db, "mediaItems"); 
         const blocksCol = collection(db, "contentBlocks");
         const usersCol = collection(db, "users");
 
@@ -157,8 +165,12 @@ export default function DashboardPage() {
         // Fetch GA Data
         const gaResult = await fetchGaData();
         if (gaResult.error) {
-          setGaError(gaResult.error);
-          console.error("GA Data Fetch Error:", gaResult.error);
+          setGaError(gaResult.error.message); // Store the message for UI display
+          // Conditional console logging
+          const knownConfigErrors = ['MISSING_GA_PROPERTY_ID', 'MISSING_CREDENTIALS_STRING', 'INVALID_CREDENTIALS_JSON'];
+          if (!knownConfigErrors.includes(gaResult.error.code)) {
+            console.error(`GA Data Fetch Error (${gaResult.error.code}): ${gaResult.error.message}`);
+          }
         } else {
           setGaData(gaResult);
         }
@@ -395,5 +407,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
