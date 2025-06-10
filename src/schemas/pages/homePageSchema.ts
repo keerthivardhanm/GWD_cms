@@ -12,7 +12,7 @@ export const HeroSlideSchema = z.object({
   alt: z.string().optional().default(''),
   heading: z.string().optional().default(''),
   paragraph: z.string().optional().default(''),
-  buttons: z.array(HeroButtonSchema).min(1, "At least one button is required").max(3, "Maximum of 3 buttons allowed").optional().default([{ text: '', link: '' }]),
+  buttons: z.array(HeroButtonSchema).min(1, "At least one button is required").max(3, "Maximum of 3 buttons allowed").optional().default([HeroButtonSchema.parse({})]),
 }).default({});
 export type HeroSlideType = z.infer<typeof HeroSlideSchema>;
 
@@ -58,7 +58,7 @@ export const GlobalPartnerSchema = z.object({
   imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
   alt: z.string().optional().default(''),
   name: z.string().optional().default(''),
-  description: z.string().optional().default(''), // Added description
+  description: z.string().optional().default(''),
 }).default({});
 export type GlobalPartnerType = z.infer<typeof GlobalPartnerSchema>;
 

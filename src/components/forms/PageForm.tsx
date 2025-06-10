@@ -83,7 +83,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
   const { toast } = useToast();
   const { user, userData } = useAuth(); 
   
-  const [currentContentType, setCurrentContentType] = useState<PageType>(initialData?.pageType || 'generic');
+  // Removed setCurrentContentType, directly use watchedPageType
 
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch, setError, clearErrors, reset, getValues } = useForm<z.infer<typeof pageFormValidationSchema>>({
     resolver: zodResolver(pageFormValidationSchema),
@@ -131,11 +131,8 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
   const { fields: careerOpportunitiesFields, append: appendCareerOpportunity, remove: removeCareerOpportunity } = useFieldArray({ control, name: "content.careerOpportunities.careers" });
   const { fields: programFaqsFields, append: appendProgramFaq, remove: removeProgramFaq } = useFieldArray({ control, name: "content.programFaqs.faqs" });
 
-  // Old: const { fields: centreCardsFields, append: appendCentreCard, remove: removeCentreCard } = useFieldArray({ control, name: "content.centreCards.centres" });
-  // New for Centres Overview
   const { fields: centresListFields, append: appendCentresListItem, remove: removeCentresListItem } = useFieldArray({ control, name: "content.centresList" });
   
-  // Field Arrays for Individual Centre Page
   const { fields: individualCentreFacilitiesFields, append: appendIndividualCentreFacility, remove: removeIndividualCentreFacility } = useFieldArray({ control, name: "content.facilitiesSection.facilities" });
   const { fields: galleryImageFields, append: appendGalleryImage, remove: removeGalleryImage } = useFieldArray({ control, name: "content.gallery" });
   
@@ -144,40 +141,51 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
 
   useEffect(() => {
     const newPageType = watchedPageType || 'generic';
-    setCurrentContentType(newPageType);
+    const existingFormValues = getValues(); 
 
-    const currentFormValues = getValues();
-    let newContentDefaults = {};
+    let newContentForReset;
 
-    try {
-      switch (newPageType) {
-          case 'home': newContentDefaults = initialData?.pageType === 'home' ? (initialData as HomePage).content : HomePageContentSchema.parse({}); break;
-          case 'about-us': newContentDefaults = initialData?.pageType === 'about-us' ? (initialData as AboutUsPage).content : AboutUsPageContentSchema.parse({}); break;
-          case 'admissions': newContentDefaults = initialData?.pageType === 'admissions' ? (initialData as AdmissionsPage).content : AdmissionsPageContentSchema.parse({}); break;
-          case 'contact': newContentDefaults = initialData?.pageType === 'contact' ? (initialData as ContactPage).content : ContactPageContentSchema.parse({}); break;
-          case 'programs': newContentDefaults = initialData?.pageType === 'programs' ? (initialData as ProgramsListingPage).content : ProgramsListingPageContentSchema.parse({}); break;
-          case 'program-detail': newContentDefaults = initialData?.pageType === 'program-detail' ? (initialData as IndividualProgramPage).content : IndividualProgramPageContentSchema.parse({}); break;
-          case 'centres': newContentDefaults = initialData?.pageType === 'centres' ? (initialData as CentresOverviewPage).content : CentresOverviewPageContentSchema.parse({}); break;
-          case 'centre-detail': newContentDefaults = initialData?.pageType === 'centre-detail' ? (initialData as IndividualCentrePage).content : IndividualCentrePageContentSchema.parse({}); break;
-          case 'enquiry': newContentDefaults = initialData?.pageType === 'enquiry' ? (initialData as EnquiryPage).content : EnquiryPageContentSchema.parse({}); break;
-          default: newContentDefaults = (initialData?.pageType === 'generic' && initialData.content) ? initialData.content : { mainContent: '' }; break;
+    if (initialData && initialData.pageType === newPageType) {
+      newContentForReset = initialData.content;
+    } else {
+      try {
+        switch (newPageType) {
+          case 'home': newContentForReset = HomePageContentSchema.parse({}); break;
+          case 'about-us': newContentForReset = AboutUsPageContentSchema.parse({}); break;
+          case 'admissions': newContentForReset = AdmissionsPageContentSchema.parse({}); break;
+          case 'contact': newContentForReset = ContactPageContentSchema.parse({}); break;
+          case 'programs': newContentForReset = ProgramsListingPageContentSchema.parse({}); break;
+          case 'program-detail': newContentForReset = IndividualProgramPageContentSchema.parse({}); break;
+          case 'centres': newContentForReset = CentresOverviewPageContentSchema.parse({}); break;
+          case 'centre-detail': newContentForReset = IndividualCentrePageContentSchema.parse({}); break;
+          case 'enquiry': newContentForReset = EnquiryPageContentSchema.parse({}); break;
+          default: newContentForReset = { mainContent: '' }; break; 
+        }
+      } catch (e) {
+        console.error(`Error parsing default content structure for page type "${newPageType}":`, e);
+        toast({ title: "Form Content Error", description: `Could not load default structure for ${newPageType}. Content may be incomplete.`, variant: "destructive" });
+        newContentForReset = (newPageType === 'generic') ? { mainContent: '' } : {}; 
       }
-    } catch(e) {
-        console.error(`Error parsing default content for page type "${newPageType}":`, JSON.stringify(e, null, 2));
-        toast({ title: "Form Initialization Error", description: `Could not initialize content for page type ${newPageType}. Defaulting to empty.`, variant: "destructive"});
-        newContentDefaults = (newPageType === 'generic') ? { mainContent: ''} : {};
     }
     
+    const baseFieldsToReset = {
+        title: (initialData && initialData.pageType === newPageType) ? initialData.title : existingFormValues.title || '',
+        slug: (initialData && initialData.pageType === newPageType) ? initialData.slug : existingFormValues.slug || '',
+        status: (initialData && initialData.pageType === newPageType) ? initialData.status : existingFormValues.status || 'Draft',
+        author: (initialData && initialData.pageType === newPageType) ? initialData.author : (existingFormValues.author || userData?.name || user?.email || 'Admin'),
+    };
+    
+    if (!baseFieldsToReset.slug && baseFieldsToReset.title) {
+        baseFieldsToReset.slug = generateSlug(baseFieldsToReset.title);
+    }
+
     reset({
-        title: initialData?.title || currentFormValues.title || '',
-        slug: initialData?.slug || currentFormValues.slug || ( (initialData?.title || currentFormValues.title) ? generateSlug(initialData?.title || currentFormValues.title) : ''),
-        status: initialData?.status || currentFormValues.status || 'Draft',
-        author: initialData?.author || currentFormValues.author || userData?.name || user?.email || 'Admin',
-        pageType: newPageType,
-        content: newContentDefaults,
+      ...baseFieldsToReset,
+      pageType: newPageType,
+      content: newContentForReset || {}, 
     });
 
-  }, [watchedPageType, initialData, reset, getValues, toast, user, userData]); 
+  }, [watchedPageType, initialData, reset, getValues, toast, user, userData]);
 
 
   useEffect(() => {
@@ -283,55 +291,71 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
     itemSchema: Record<string, { label: string; type: 'input' | 'textarea' | 'select'; options?: string[]; placeholder?: string }>,
     itemDefaultGenerator: () => any, 
     sectionTitle: string
-  ) => (
-    <Card className="my-4">
-      <CardHeader>
-        <CardTitle className="text-md">{sectionTitle}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {fields.map((field, index) => (
-          <Card key={field.id} className="p-3 bg-muted/50">
-            <div className="space-y-2">
-              {Object.entries(itemSchema).map(([key, schema]) => (
-                <div key={key}>
-                  <Label htmlFor={`${baseName}.${index}.${key}`}>{schema.label}</Label>
-                  {schema.type === 'textarea' ? (
-                    <Textarea {...register(`${baseName}.${index}.${key}` as const)} placeholder={schema.placeholder || `Enter ${schema.label.toLowerCase()}`} />
-                  ) : schema.type === 'select' && schema.options ? (
-                     <Controller
-                        name={`${baseName}.${index}.${key}` as const}
-                        control={control}
-                        render={({ field: selectField }) => (
-                           <Select onValueChange={selectField.onChange} defaultValue={selectField.value}>
-                            <SelectTrigger><SelectValue placeholder={`Select ${schema.label.toLowerCase()}`} /></SelectTrigger>
-                            <SelectContent>
-                              {schema.options?.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
+  ) => {
+    const pathParts = baseName.split('.'); // e.g., ['content', 'sectionName', 'arrayName']
+    
+    return (
+      <Card className="my-4">
+        <CardHeader>
+          <CardTitle className="text-md">{sectionTitle}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {fields.map((field, index) => {
+            let currentErrorObjectForArray: any = errors;
+            for (const part of pathParts) {
+              currentErrorObjectForArray = currentErrorObjectForArray?.[part];
+              if (!currentErrorObjectForArray) break;
+            }
+            const arrayItemErrors = currentErrorObjectForArray?.[index];
+
+            return (
+              <Card key={field.id} className="p-3 bg-muted/50">
+                <div className="space-y-2">
+                  {Object.entries(itemSchema).map(([key, schema]) => {
+                    const fieldError = arrayItemErrors?.[key];
+                    return (
+                      <div key={key}>
+                        <Label htmlFor={`${baseName}.${index}.${key}`}>{schema.label}</Label>
+                        {schema.type === 'textarea' ? (
+                          <Textarea {...register(`${baseName}.${index}.${key}` as const)} placeholder={schema.placeholder || `Enter ${schema.label.toLowerCase()}`} />
+                        ) : schema.type === 'select' && schema.options ? (
+                          <Controller
+                              name={`${baseName}.${index}.${key}` as const}
+                              control={control}
+                              render={({ field: selectField }) => (
+                                <Select onValueChange={selectField.onChange} defaultValue={selectField.value}>
+                                  <SelectTrigger><SelectValue placeholder={`Select ${schema.label.toLowerCase()}`} /></SelectTrigger>
+                                  <SelectContent>
+                                    {schema.options?.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            />
+                        ) : (
+                          <Input {...register(`${baseName}.${index}.${key}` as const)} placeholder={schema.placeholder || `Enter ${schema.label.toLowerCase()}`} />
                         )}
-                      />
-                  ) : (
-                    <Input {...register(`${baseName}.${index}.${key}` as const)} placeholder={schema.placeholder || `Enter ${schema.label.toLowerCase()}`} />
-                  )}
-                  {errors?.content?.[baseName.split('.')[1]]?.[baseName.split('.')[2]]?.[index]?.[key] && (
-                    <p className="text-sm text-destructive mt-1">
-                        {(errors.content as any)?.[baseName.split('.')[1]]?.[baseName.split('.')[2]]?.[index]?.[key]?.message}
-                    </p>
-                   )}
+                        {fieldError && (
+                          <p className="text-sm text-destructive mt-1">
+                            {(fieldError as any)?.message}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
-            <Button type="button" variant="destructive" size="sm" onClick={() => removeFn(index)} className="mt-2">
-              <Trash2 className="mr-1 h-3 w-3"/> Remove Item
-            </Button>
-          </Card>
-        ))}
-        <Button type="button" variant="outline" size="sm" onClick={() => appendFn(itemDefaultGenerator())}>
-          <PlusCircle className="mr-1 h-3 w-3"/> Add Item
-        </Button>
-      </CardContent>
-    </Card>
-  );
+                <Button type="button" variant="destructive" size="sm" onClick={() => removeFn(index)} className="mt-2">
+                  <Trash2 className="mr-1 h-3 w-3"/> Remove Item
+                </Button>
+              </Card>
+            );
+          })}
+          <Button type="button" variant="outline" size="sm" onClick={() => appendFn(itemDefaultGenerator())}>
+            <PlusCircle className="mr-1 h-3 w-3"/> Add Item
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  };
 
   const HeroSlidesFormSection = () => (
     <Card className="my-4">
@@ -362,19 +386,17 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                       <Button type="button" variant="destructive" size="xs" onClick={() => removeHeroButton(buttonIndex)} disabled={heroButtonsFields.length <= 1}>
                         <Trash2 className="mr-1 h-3 w-3"/> Remove Button
                       </Button>
-                       {/* Display Zod validation error for button fields if any */}
                         {errors.content?.heroSection?.slides?.[slideIndex]?.buttons?.[buttonIndex]?.text && (
-                          <p className="text-xs text-destructive mt-1">{(errors.content.heroSection.slides[slideIndex].buttons[buttonIndex].text as any)?.message}</p>
+                          <p className="text-xs text-destructive mt-1">{(errors.content?.heroSection?.slides?.[slideIndex]?.buttons?.[buttonIndex]?.text as any)?.message}</p>
                         )}
                         {errors.content?.heroSection?.slides?.[slideIndex]?.buttons?.[buttonIndex]?.link && (
-                          <p className="text-xs text-destructive mt-1">{(errors.content.heroSection.slides[slideIndex].buttons[buttonIndex].link as any)?.message}</p>
+                          <p className="text-xs text-destructive mt-1">{(errors.content?.heroSection?.slides?.[slideIndex]?.buttons?.[buttonIndex]?.link as any)?.message}</p>
                         )}
                     </Card>
                   ))}
                   <Button type="button" variant="outline" size="xs" onClick={() => appendHeroButton(HeroButtonSchema.parse({}))} disabled={heroButtonsFields.length >= 3}>
                     <PlusCircle className="mr-1 h-3 w-3"/> Add Button
                   </Button>
-                  {/* Display Zod validation error for the buttons array itself (e.g., min/max items) */}
                   {errors.content?.heroSection?.slides?.[slideIndex]?.buttons && typeof errors.content.heroSection.slides[slideIndex].buttons === 'object' && !Array.isArray(errors.content.heroSection.slides[slideIndex].buttons) && (errors.content.heroSection.slides[slideIndex].buttons as any).message && (
                     <p className="text-sm text-destructive mt-1">{(errors.content.heroSection.slides[slideIndex].buttons as any).message}</p>
                   )}
@@ -419,7 +441,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
             name="pageType"
             control={control}
             render={({ field }) => (
-              <Select onValueChange={(value) => { field.onChange(value); }} defaultValue={field.value}>
+              <Select onValueChange={(value) => { field.onChange(value); }} value={field.value || 'generic'}>
                 <SelectTrigger id="pageType">
                   <SelectValue placeholder="Select page type" />
                 </SelectTrigger>
@@ -440,7 +462,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
             name="status"
             control={control}
             render={({ field }) => (
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value || 'Draft'}>
                 <SelectTrigger id="status">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
@@ -461,7 +483,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
           {errors.author && <p className="text-sm text-destructive mt-1">{errors.author.message}</p>}
         </div>
 
-        {currentContentType === 'home' && (
+        {watchedPageType === 'home' && (
           <Card className="border-t pt-4 mt-4">
             <CardHeader><CardTitle className="text-lg">Home Page Content</CardTitle><CardDescription>Manage content for the Home page.</CardDescription></CardHeader>
             <CardContent>
@@ -550,7 +572,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
           </Card>
         )}
 
-        {currentContentType === 'admissions' && (
+        {watchedPageType === 'admissions' && (
           <Card className="border-t pt-4 mt-4">
             <CardHeader><CardTitle className="text-lg">Admissions Page Content</CardTitle><CardDescription>Manage content for the Admissions page.</CardDescription></CardHeader>
             <CardContent>
@@ -594,7 +616,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
           </Card>
         )}
 
-        {currentContentType === 'about-us' && (
+        {watchedPageType === 'about-us' && (
           <Card className="border-t pt-4 mt-4">
             <CardHeader><CardTitle className="text-lg">About Us Page Content</CardTitle><CardDescription>Manage content for the About Us page.</CardDescription></CardHeader>
             <CardContent>
@@ -628,7 +650,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
           </Card>
         )}
 
-        {currentContentType === 'programs' && (
+        {watchedPageType === 'programs' && (
            <Card className="border-t pt-4 mt-4">
             <CardHeader><CardTitle className="text-lg">Programs Listing Page Content</CardTitle><CardDescription>Manage content for the Programs Listing page.</CardDescription></CardHeader>
             <CardContent>
@@ -650,7 +672,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
            </Card>
         )}
 
-        {currentContentType === 'program-detail' && (
+        {watchedPageType === 'program-detail' && (
             <Card className="border-t pt-4 mt-4">
                 <CardHeader><CardTitle className="text-lg">Individual Program Page Content</CardTitle><CardDescription>Manage content for an Individual Program page.</CardDescription></CardHeader>
                 <CardContent>
@@ -705,7 +727,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
             </Card>
         )}
         
-        {currentContentType === 'centres' && (
+        {watchedPageType === 'centres' && (
           <Card className="border-t pt-4 mt-4">
             <CardHeader><CardTitle className="text-lg">Centres Overview Page Content</CardTitle></CardHeader>
             <CardContent>
@@ -779,7 +801,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
           </Card>
         )}
 
-        {currentContentType === 'centre-detail' && (
+        {watchedPageType === 'centre-detail' && (
             <Card className="border-t pt-4 mt-4">
                 <CardHeader><CardTitle className="text-lg">Individual Centre Page Content</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
@@ -860,7 +882,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
             </Card>
         )}
 
-        {currentContentType === 'contact' && (
+        {watchedPageType === 'contact' && (
           <Card className="border-t pt-4 mt-4">
             <CardHeader><CardTitle className="text-lg">Contact Page Content</CardTitle><CardDescription>Manage content for the Contact page.</CardDescription></CardHeader>
             <CardContent>
@@ -885,7 +907,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
           </Card>
         )}
 
-        {currentContentType === 'enquiry' && (
+        {watchedPageType === 'enquiry' && (
              <Card className="border-t pt-4 mt-4">
                 <CardHeader><CardTitle className="text-lg">Enquiry Page Content</CardTitle><CardDescription>Manage content for the Enquiry page.</CardDescription></CardHeader>
                 <CardContent>
@@ -908,7 +930,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
              </Card>
         )}
 
-        {currentContentType === 'generic' && (
+        {watchedPageType === 'generic' && (
              <Card className="border-t pt-4 mt-4">
                 <CardHeader><CardTitle className="text-lg">Generic Page Content</CardTitle><CardDescription>Manage generic content using Markdown or HTML.</CardDescription></CardHeader>
                 <CardContent>
