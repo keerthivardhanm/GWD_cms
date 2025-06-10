@@ -16,12 +16,12 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext'; 
 
-import { HomePageContentSchema, HeroSlideSchema, WhyChooseFeatureSchema, ProgramItemSchema, CounterItemSchema, CentreItemSchema as HomeCentreItemSchema, AccreditationLogoSchema, GlobalPartnerSchema } from '@/schemas/pages/homePageSchema';
+import { HomePageContentSchema, HeroSlideSchema, WhyChooseFeatureSchema, ProgramItemSchema, CounterItemSchema, CentreItemSchema as HomeCentreItemSchema, AccreditationLogoSchema, GlobalPartnerSchema, HeroButtonSchema } from '@/schemas/pages/homePageSchema';
 import { AboutUsPageContentSchema, MissionPointSchema, TimelineEventSchema } from '@/schemas/pages/aboutUsPageSchema';
 import { AdmissionsPageContentSchema, ApplicationStepSchema, FaqItemSchema } from '@/schemas/pages/admissionsPageSchema';
 import { ContactPageContentSchema } from '@/schemas/pages/contactPageSchema';
 import { ProgramsListingPageContentSchema, ProgramTabSchema, ProgramCardSchema } from '@/schemas/pages/programsListingPageSchema';
-import { IndividualProgramPageContentSchema, StringListItemSchema as IndividualProgramStringListItemSchema } from '@/schemas/pages/individualProgramPageSchema';
+import { IndividualProgramPageContentSchema, StringListItemSchema as IndividualProgramStringListItemSchema } from '@/schemas/pages/individualProgramPageSchema'; 
 import { CentresOverviewPageContentSchema, CentreCardSchema as OverviewCentreCardSchema } from '@/schemas/pages/centresOverviewPageSchema';
 import { IndividualCentrePageContentSchema, CentreFeatureSchema as IndividualCentreFeatureSchema } from '@/schemas/pages/individualCentrePageSchema';
 import { EnquiryPageContentSchema, EnquiryFormFieldSchema } from '@/schemas/pages/enquiryPageSchema';
@@ -142,44 +142,24 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
     const newPageType = watchedPageType || 'generic';
     setCurrentContentType(newPageType);
 
-    const currentFormValues = getValues(); // Get current form values before reset
+    const currentFormValues = getValues();
     let newContentDefaults = {};
 
     try {
       switch (newPageType) {
-          case 'home':
-              newContentDefaults = initialData?.pageType === 'home' ? (initialData as HomePage).content : HomePageContentSchema.parse({});
-              break;
-          case 'about-us':
-              newContentDefaults = initialData?.pageType === 'about-us' ? (initialData as AboutUsPage).content : AboutUsPageContentSchema.parse({});
-              break;
-          case 'admissions':
-              newContentDefaults = initialData?.pageType === 'admissions' ? (initialData as AdmissionsPage).content : AdmissionsPageContentSchema.parse({});
-              break;
-          case 'contact':
-              newContentDefaults = initialData?.pageType === 'contact' ? (initialData as ContactPage).content : ContactPageContentSchema.parse({});
-              break;
-          case 'programs':
-              newContentDefaults = initialData?.pageType === 'programs' ? (initialData as ProgramsListingPage).content : ProgramsListingPageContentSchema.parse({});
-              break;
-          case 'program-detail':
-              newContentDefaults = initialData?.pageType === 'program-detail' ? (initialData as IndividualProgramPage).content : IndividualProgramPageContentSchema.parse({});
-              break;
-          case 'centres':
-              newContentDefaults = initialData?.pageType === 'centres' ? (initialData as CentresOverviewPage).content : CentresOverviewPageContentSchema.parse({});
-              break;
-          case 'centre-detail':
-              newContentDefaults = initialData?.pageType === 'centre-detail' ? (initialData as IndividualCentrePage).content : IndividualCentrePageContentSchema.parse({});
-              break;
-          case 'enquiry':
-              newContentDefaults = initialData?.pageType === 'enquiry' ? (initialData as EnquiryPage).content : EnquiryPageContentSchema.parse({});
-              break;
-          default: // generic
-              newContentDefaults = (initialData?.pageType === 'generic' && initialData.content) ? initialData.content : { mainContent: '' };
-              break;
+          case 'home': newContentDefaults = initialData?.pageType === 'home' ? (initialData as HomePage).content : HomePageContentSchema.parse({}); break;
+          case 'about-us': newContentDefaults = initialData?.pageType === 'about-us' ? (initialData as AboutUsPage).content : AboutUsPageContentSchema.parse({}); break;
+          case 'admissions': newContentDefaults = initialData?.pageType === 'admissions' ? (initialData as AdmissionsPage).content : AdmissionsPageContentSchema.parse({}); break;
+          case 'contact': newContentDefaults = initialData?.pageType === 'contact' ? (initialData as ContactPage).content : ContactPageContentSchema.parse({}); break;
+          case 'programs': newContentDefaults = initialData?.pageType === 'programs' ? (initialData as ProgramsListingPage).content : ProgramsListingPageContentSchema.parse({}); break;
+          case 'program-detail': newContentDefaults = initialData?.pageType === 'program-detail' ? (initialData as IndividualProgramPage).content : IndividualProgramPageContentSchema.parse({}); break;
+          case 'centres': newContentDefaults = initialData?.pageType === 'centres' ? (initialData as CentresOverviewPage).content : CentresOverviewPageContentSchema.parse({}); break;
+          case 'centre-detail': newContentDefaults = initialData?.pageType === 'centre-detail' ? (initialData as IndividualCentrePage).content : IndividualCentrePageContentSchema.parse({}); break;
+          case 'enquiry': newContentDefaults = initialData?.pageType === 'enquiry' ? (initialData as EnquiryPage).content : EnquiryPageContentSchema.parse({}); break;
+          default: newContentDefaults = (initialData?.pageType === 'generic' && initialData.content) ? initialData.content : { mainContent: '' }; break;
       }
     } catch(e) {
-        console.error(`Error parsing default content for page type "${newPageType}":`, e);
+        console.error(`Error parsing default content for page type "${newPageType}":`, JSON.stringify(e, null, 2));
         toast({ title: "Form Initialization Error", description: `Could not initialize content for page type ${newPageType}. Defaulting to empty.`, variant: "destructive"});
         newContentDefaults = (newPageType === 'generic') ? { mainContent: ''} : {};
     }
@@ -197,7 +177,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
 
 
   useEffect(() => {
-    if (watchedTitle && !initialData?.slug && !getValues("slug") && !initialData?.title) { // Only auto-generate slug if it's a truly new page (no initialData title/slug)
+    if (watchedTitle && !initialData?.slug && !getValues("slug") && !initialData?.title) {
       setValue("slug", generateSlug(watchedTitle), { shouldValidate: true });
     }
   }, [watchedTitle, setValue, initialData, getValues]);
@@ -264,43 +244,20 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
 
     try {
         switch (data.pageType) {
-            case 'home':
-                pageContent = HomePageContentSchema.parse(contentFromForm);
-                break;
-            case 'about-us':
-                pageContent = AboutUsPageContentSchema.parse(contentFromForm);
-                break;
-            case 'admissions':
-                pageContent = AdmissionsPageContentSchema.parse(contentFromForm);
-                break;
-            case 'contact':
-                pageContent = ContactPageContentSchema.parse(contentFromForm);
-                break;
-            case 'programs':
-                pageContent = ProgramsListingPageContentSchema.parse(contentFromForm);
-                break;
-            case 'program-detail':
-                pageContent = IndividualProgramPageContentSchema.parse(contentFromForm);
-                break;
-            case 'centres':
-                pageContent = CentresOverviewPageContentSchema.parse(contentFromForm);
-                break;
-            case 'centre-detail':
-                pageContent = IndividualCentrePageContentSchema.parse(contentFromForm);
-                break;
-            case 'enquiry':
-                pageContent = EnquiryPageContentSchema.parse(contentFromForm);
-                break;
-            default: // generic
-                pageContent = contentFromForm; 
-                if (typeof pageContent.mainContent === 'undefined') { 
-                    pageContent.mainContent = '';
-                }
-                break;
+            case 'home': pageContent = HomePageContentSchema.parse(contentFromForm); break;
+            case 'about-us': pageContent = AboutUsPageContentSchema.parse(contentFromForm); break;
+            case 'admissions': pageContent = AdmissionsPageContentSchema.parse(contentFromForm); break;
+            case 'contact': pageContent = ContactPageContentSchema.parse(contentFromForm); break;
+            case 'programs': pageContent = ProgramsListingPageContentSchema.parse(contentFromForm); break;
+            case 'program-detail': pageContent = IndividualProgramPageContentSchema.parse(contentFromForm); break;
+            case 'centres': pageContent = CentresOverviewPageContentSchema.parse(contentFromForm); break;
+            case 'centre-detail': pageContent = IndividualCentrePageContentSchema.parse(contentFromForm); break;
+            case 'enquiry': pageContent = EnquiryPageContentSchema.parse(contentFromForm); break;
+            default: pageContent = contentFromForm; if (typeof pageContent.mainContent === 'undefined') { pageContent.mainContent = ''; } break;
         }
     } catch (e) {
         if (e instanceof z.ZodError) {
-            console.error("Content validation error for page type", `'${data.pageType}'`, ":", JSON.stringify(e.errors, null, 2));
+            console.error("Content validation error:", JSON.stringify(e.errors, null, 2));
             toast({
                 title: "Content Validation Error",
                 description: `There are issues with the content for page type "${data.pageType}". Check console for details.`,
@@ -352,8 +309,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                   ) : (
                     <Input {...register(`${baseName}.${index}.${key}` as const)} placeholder={schema.placeholder || `Enter ${schema.label.toLowerCase()}`} />
                   )}
-                  {/* Basic error display attempt for field arrays */}
-                  {errors.content && (errors.content as any)?.[baseName.split('.')[1]]?.[baseName.split('.')[2]]?.[index]?.[key] && (
+                  {errors?.content?.[baseName.split('.')[1]]?.[baseName.split('.')[2]]?.[index]?.[key] && (
                     <p className="text-sm text-destructive mt-1">
                         {(errors.content as any)?.[baseName.split('.')[1]]?.[baseName.split('.')[2]]?.[index]?.[key]?.message}
                     </p>
@@ -368,6 +324,67 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
         ))}
         <Button type="button" variant="outline" size="sm" onClick={() => appendFn(itemDefaultGenerator())}>
           <PlusCircle className="mr-1 h-3 w-3"/> Add Item
+        </Button>
+      </CardContent>
+    </Card>
+  );
+
+  const HeroSlidesFormSection = () => (
+    <Card className="my-4">
+      <CardHeader><CardTitle className="text-md">Hero Slides</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        {heroSlidesFields.map((slideField, slideIndex) => {
+          const { fields: heroButtonsFields, append: appendHeroButton, remove: removeHeroButton } = useFieldArray({
+            control,
+            name: `content.heroSection.slides.${slideIndex}.buttons`
+          });
+
+          return (
+            <Card key={slideField.id} className="p-4 bg-muted/50 space-y-3">
+              <h4 className="font-medium text-sm mb-2">Slide {slideIndex + 1}</h4>
+              <div><Label htmlFor={`content.heroSection.slides.${slideIndex}.imgSrc`}>Image URL</Label><Input {...register(`content.heroSection.slides.${slideIndex}.imgSrc`)} placeholder="https://placehold.co/1920x1080.png" /></div>
+              <div><Label htmlFor={`content.heroSection.slides.${slideIndex}.alt`}>Image Alt Text</Label><Input {...register(`content.heroSection.slides.${slideIndex}.alt`)} placeholder="Descriptive alt text" /></div>
+              <div><Label htmlFor={`content.heroSection.slides.${slideIndex}.heading`}>Heading</Label><Input {...register(`content.heroSection.slides.${slideIndex}.heading`)} placeholder="Hero slide heading" /></div>
+              <div><Label htmlFor={`content.heroSection.slides.${slideIndex}.paragraph`}>Paragraph</Label><Textarea {...register(`content.heroSection.slides.${slideIndex}.paragraph`)} placeholder="Hero slide paragraph" /></div>
+              
+              <Card className="my-2 p-3">
+                <CardHeader className="p-0 pb-2"><CardTitle className="text-sm">Buttons (Min 1, Max 3)</CardTitle></CardHeader>
+                <CardContent className="p-0 space-y-2">
+                  {heroButtonsFields.map((buttonField, buttonIndex) => (
+                    <Card key={buttonField.id} className="p-2 bg-background/70 space-y-1">
+                      <h5 className="font-medium text-xs mb-1">Button {buttonIndex + 1}</h5>
+                      <div><Label htmlFor={`content.heroSection.slides.${slideIndex}.buttons.${buttonIndex}.text`}>Button Text</Label><Input {...register(`content.heroSection.slides.${slideIndex}.buttons.${buttonIndex}.text`)} placeholder="Learn More" /></div>
+                      <div><Label htmlFor={`content.heroSection.slides.${slideIndex}.buttons.${buttonIndex}.link`}>Button Link</Label><Input {...register(`content.heroSection.slides.${slideIndex}.buttons.${buttonIndex}.link`)} placeholder="/about-us" /></div>
+                      <Button type="button" variant="destructive" size="xs" onClick={() => removeHeroButton(buttonIndex)} disabled={heroButtonsFields.length <= 1}>
+                        <Trash2 className="mr-1 h-3 w-3"/> Remove Button
+                      </Button>
+                       {/* Display Zod validation error for button fields if any */}
+                        {errors.content?.heroSection?.slides?.[slideIndex]?.buttons?.[buttonIndex]?.text && (
+                          <p className="text-xs text-destructive mt-1">{(errors.content.heroSection.slides[slideIndex].buttons[buttonIndex].text as any)?.message}</p>
+                        )}
+                        {errors.content?.heroSection?.slides?.[slideIndex]?.buttons?.[buttonIndex]?.link && (
+                          <p className="text-xs text-destructive mt-1">{(errors.content.heroSection.slides[slideIndex].buttons[buttonIndex].link as any)?.message}</p>
+                        )}
+                    </Card>
+                  ))}
+                  <Button type="button" variant="outline" size="xs" onClick={() => appendHeroButton(HeroButtonSchema.parse({}))} disabled={heroButtonsFields.length >= 3}>
+                    <PlusCircle className="mr-1 h-3 w-3"/> Add Button
+                  </Button>
+                  {/* Display Zod validation error for the buttons array itself (e.g., min/max items) */}
+                  {errors.content?.heroSection?.slides?.[slideIndex]?.buttons && typeof errors.content.heroSection.slides[slideIndex].buttons === 'object' && !Array.isArray(errors.content.heroSection.slides[slideIndex].buttons) && (errors.content.heroSection.slides[slideIndex].buttons as any).message && (
+                    <p className="text-sm text-destructive mt-1">{(errors.content.heroSection.slides[slideIndex].buttons as any).message}</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Button type="button" variant="destructive" size="sm" onClick={() => removeHeroSlide(slideIndex)} className="mt-2">
+                <Trash2 className="mr-1 h-3 w-3"/> Remove Slide
+              </Button>
+            </Card>
+          )
+        })}
+        <Button type="button" variant="outline" size="sm" onClick={() => appendHeroSlide(HeroSlideSchema.parse({}))}>
+          <PlusCircle className="mr-1 h-3 w-3"/> Add Hero Slide
         </Button>
       </CardContent>
     </Card>
@@ -444,18 +461,7 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
           <Card className="border-t pt-4 mt-4">
             <CardHeader><CardTitle className="text-lg">Home Page Content</CardTitle><CardDescription>Manage content for the Home page.</CardDescription></CardHeader>
             <CardContent>
-              {renderFieldArray(
-                heroSlidesFields, removeHeroSlide, () => appendHeroSlide(HeroSlideSchema.parse({})), "content.heroSection.slides",
-                { 
-                  imgSrc: { label: "Image URL", type: 'input', placeholder: "https://placehold.co/1920x1080.png" },
-                  alt: { label: "Image Alt Text", type: 'input', placeholder: "Descriptive alt text" },
-                  heading: { label: "Heading", type: 'input', placeholder: "Hero slide heading" },
-                  paragraph: { label: "Paragraph", type: 'textarea', placeholder: "Hero slide paragraph" },
-                  btnText: { label: "Button Text", type: 'input', placeholder: "Learn More" },
-                  btnLink: { label: "Button Link", type: 'input', placeholder: "/about-us" },
-                },
-                () => HeroSlideSchema.parse({}), "Hero Slides"
-              )}
+              <HeroSlidesFormSection />
               <Card className="my-4"><CardHeader><CardTitle className="text-md">Why Choose Apollo</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
                   <div><Label htmlFor="content.whyChoose.introHeading">Intro Heading</Label><Input {...register("content.whyChoose.introHeading")} placeholder="Why Choose Us?" /></div>
