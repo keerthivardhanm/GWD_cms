@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { KeyMetricCard } from "@/components/dashboard/KeyMetricsCard";
 import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart";
 import { KeepNotes } from "@/components/dashboard/KeepNotes";
-import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed";
+import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed"; // Keep this for future if needed elsewhere
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Package, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity, UserPlus } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,7 +73,7 @@ export default function DashboardPage() {
       try {
         // Fetch counts
         const pagesCol = collection(db, "pages");
-        const filesCol = collection(db, "mediaItems");
+        const filesCol = collection(db, "mediaItems"); // Assuming 'mediaItems' for files
         const blocksCol = collection(db, "contentBlocks");
         const usersCol = collection(db, "users");
 
@@ -378,9 +378,9 @@ export default function DashboardPage() {
                             <AvatarFallback>{log.userName.substring(0,2).toUpperCase()}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
-                        <p className="text-sm font-medium leading-none">
-                            <span className="font-semibold">{log.userName}</span> {log.action.toLowerCase().replace('_', ' ')} {log.entityType && <Badge variant="secondary" className="ml-1 text-xs">{log.entityType}</Badge>} <span className="text-muted-foreground">{log.entityName && log.entityName !== log.id ? `"${log.entityName}"` : ''}</span>.
-                        </p>
+                        <div className="text-sm font-medium leading-none">
+                            <span className="font-semibold">{log.userName}</span> {log.action.toLowerCase().replace(/_/g, ' ')} {log.entityType && <Badge variant="secondary" className="ml-1 text-xs align-middle">{log.entityType}</Badge>} <span className="text-muted-foreground">{log.entityName && log.entityName !== log.id ? `"${log.entityName}"` : ''}</span>.
+                        </div>
                         <p className="text-xs text-muted-foreground">{log.timestamp}</p>
                         </div>
                     </div>
@@ -395,3 +395,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

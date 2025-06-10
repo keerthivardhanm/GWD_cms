@@ -42,7 +42,7 @@ async function initializeGaClient() {
 
 
 export async function fetchGaData(): Promise<GaDataOutput> {
-  return fetchGaDataFlow();
+  return fetchGaDataFlow(null);
 }
 
 const fetchGaDataFlow = ai.defineFlow(
@@ -131,3 +131,5 @@ const fetchGaDataFlow = ai.defineFlow(
     }
   }
 );
+
+    

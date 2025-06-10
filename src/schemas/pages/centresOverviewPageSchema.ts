@@ -12,7 +12,7 @@ export type CentreFacilityType = z.infer<typeof CentreFacilitySchema>;
 export const CentreListItemSchema = z.object({
   imageSrc: z.string().url({ message: "Invalid image URL" }).or(z.literal('')).optional().default(''),
   imageAlt: z.string().optional().default(''),
-  name: z.string().min(1, "Centre name is required").optional().default(''),
+  name: z.string().optional().default(''), // Removed .min(1)
   description: z.string().optional().default(''),
   address: z.string().optional().default(''),
   phone: z.string().optional().default(''),
@@ -34,3 +34,5 @@ export const CentresOverviewPageContentSchema = z.object({
 }).default({});
 
 export type CentresOverviewPageContentType = z.infer<typeof CentresOverviewPageContentSchema>;
+
+    
