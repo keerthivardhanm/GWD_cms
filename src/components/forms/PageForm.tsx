@@ -525,7 +525,12 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                     <div><Label htmlFor="content.globalPartnerships.sectionHeading">Section Heading</Label><Input {...register("content.globalPartnerships.sectionHeading")} /></div>
                     {renderFieldArray(
                         globalPartnershipsFields, removeGlobalPartnership, () => appendGlobalPartnership(GlobalPartnerSchema.parse({})), "content.globalPartnerships.partners",
-                        { imgSrc: { label: "Partner Logo URL", type: 'input' }, alt: { label: "Partner Alt", type: 'input' }, name: { label: "Partner Name", type: 'input' }},
+                        { 
+                            imgSrc: { label: "Partner Logo URL", type: 'input' }, 
+                            alt: { label: "Partner Alt", type: 'input' }, 
+                            name: { label: "Partner Name", type: 'input' },
+                            description: { label: "Partner Description", type: 'textarea' } // Added description field
+                        },
                         () => GlobalPartnerSchema.parse({}), "Partners"
                     )}
                 </CardContent>

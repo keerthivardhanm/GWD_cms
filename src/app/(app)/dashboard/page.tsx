@@ -8,7 +8,7 @@ import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart";
 import { KeepNotes } from "@/components/dashboard/KeepNotes";
 import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Package, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity } from "lucide-react";
+import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Package, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity, UserPlus } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -158,6 +158,7 @@ export default function DashboardPage() {
         const gaResult = await fetchGaData();
         if (gaResult.error) {
           setGaError(gaResult.error);
+          console.error("GA Data Fetch Error:", gaResult.error);
         } else {
           setGaData(gaResult);
         }
@@ -247,10 +248,22 @@ export default function DashboardPage() {
               </div>
             )}
             {gaError && !loadingGaData && (
-              <div className="p-4 text-center text-destructive bg-destructive/10 rounded-md">
-                <p>Error loading GA Data: {gaError}</p>
-                <p className="text-xs mt-1">Ensure GA_PROPERTY_ID and GOOGLE_APPLICATION_CREDENTIALS_JSON_STRING are correctly set in .env.local and the service account has 'Viewer' permission on the GA property.</p>
-              </div>
+              <Card className="border-destructive bg-destructive/5 text-destructive">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <ShieldAlert className="h-5 w-5" /> GA Data Error
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="font-medium">Failed to load Google Analytics data:</p>
+                  <p className="text-sm mb-2">{gaError}</p>
+                  <p className="text-xs ">
+                    Please ensure `GA_PROPERTY_ID` and `GOOGLE_APPLICATION_CREDENTIALS_JSON_STRING` 
+                    are correctly set in your `.env.local` file (restart server after changes). 
+                    Also, verify the service account has 'Viewer' permission on the GA property in Google Analytics admin settings.
+                  </p>
+                </CardContent>
+              </Card>
             )}
             {!loadingGaData && !gaError && gaData && (
               <div className="space-y-6">
