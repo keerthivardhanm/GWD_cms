@@ -12,7 +12,7 @@ export type CentreFacilityType = z.infer<typeof CentreFacilitySchema>;
 export const CentreListItemSchema = z.object({
   imageSrc: z.string().url({ message: "Invalid image URL" }).or(z.literal('')).optional().default(''),
   imageAlt: z.string().optional().default(''),
-  name: z.string().optional().default(''), // Removed .min(1)
+  name: z.string().optional().default('New Centre').describe("Defaults to 'New Centre', user should update"), // Changed default
   description: z.string().optional().default(''),
   address: z.string().optional().default(''),
   phone: z.string().optional().default(''),
@@ -20,7 +20,7 @@ export const CentreListItemSchema = z.object({
   facilitiesHeading: z.string().optional().default('Key Facilities'),
   facilities: z.array(CentreFacilitySchema).optional().default([]),
   detailsButtonText: z.string().optional().default('View Details'),
-  detailsButtonLink: z.string().optional().default('').describe("Slug for the individual centre page, e.g., /centres/chennai"),
+  detailsButtonLink: z.string().optional().default('').describe("Slug for the individual centre page, e.g., /centres/your-centre-slug"),
 }).default({});
 export type CentreListItemType = z.infer<typeof CentreListItemSchema>;
 
