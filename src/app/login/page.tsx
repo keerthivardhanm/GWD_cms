@@ -2,6 +2,7 @@
 "use client";
 
 import Link from 'next/link';
+import Image from 'next/image'; // Import next/image
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Bug, Loader2 } from 'lucide-react'; 
+import { Loader2 } from 'lucide-react'; 
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/context/AuthContext';
 import { useEffect } from 'react';
@@ -40,10 +41,13 @@ export default function LoginPage() {
     try {
       await login(data.email, data.password);
     } catch (error) {
-      // Error is handled by useAuth and toast is displayed there
       console.error("Login page caught error:", error); 
     }
   };
+
+  // Placeholder logo URL - replace with your actual hosted logo
+  const logoUrl = "https://placehold.co/200x55.png?text=Apollo+Allied+Health+Academy"; 
+  // Original logo seems to be around 400x110. For login page, let's use 200x55.
 
   if (authLoading && !user) { 
     return (
@@ -64,7 +68,16 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40 p-4">
       <div className="mb-8 text-center">
-        <Bug className="mx-auto h-12 w-12 text-primary" />
+        <div className="flex justify-center mb-4">
+          <Image 
+            src={logoUrl} 
+            alt={`${APP_NAME} Logo`} 
+            width={200} 
+            height={55}
+            priority
+            data-ai-hint="app logo"
+          />
+        </div>
         <h1 className="text-3xl font-bold text-foreground mt-2">Welcome to {APP_NAME}</h1>
         <p className="text-muted-foreground">Sign in to access your dashboard.</p>
       </div>

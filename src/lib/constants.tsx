@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   History,
   Settings,
-  Image as ImageIcon,
+  // ImageIcon, // No longer needed as Media Manager is removed
   ClipboardList,
   Search,
   Users
@@ -28,7 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/pages', label: 'Pages', icon: FileText },
   { href: '/content-files', label: 'Content Files', icon: Boxes },
   { href: '/content-blocks', label: 'Content Blocks', icon: Grid },
-  { href: '/media-manager', label: 'Media Manager', icon: ImageIcon },
+  // { href: '/media-manager', label: 'Media Manager', icon: ImageIcon }, // Removed Media Manager
   // {
   //   groupLabel: 'Development',
   //   href: '#', // Placeholder, not a direct link
@@ -52,4 +52,4 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-export const APP_NAME = "Apollo CMS";
+export const APP_NAME = "Apollo Allied Health Academy";
