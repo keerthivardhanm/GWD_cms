@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { PlusCircle, MoreHorizontal, Edit2, Trash2, UserPlus, Shield, Users, Loader2, Search } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Edit2, Trash2, UserPlus, Shield, Users, Loader2, Search, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -220,7 +220,19 @@ export default function AccessControlPage() {
     try {
       await deleteDoc(doc(db, "users", userId));
       await logAuditEvent(authUser, authUserData, 'USER_DELETED', 'User', userId, userName);
-      toast({ title: "User Profile Removed", description: `User profile "${userName}" removed from Firestore. Firebase Auth account may still exist.` });
+      toast({ 
+        title: "User Profile Removed from CMS", 
+        description: (
+            <div>
+                <p>User profile "{userName}" removed from CMS (Firestore).</p>
+                <p className="mt-2 font-semibold text-amber-700 dark:text-amber-500 flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-2 shrink-0" />
+                    Important: The user's Firebase Authentication account still exists. To fully prevent login, manually disable or delete this account in the Firebase Console.
+                </p>
+            </div>
+        ),
+        duration: 10000, // Longer duration for important message
+      });
       fetchUsers();
     } catch (err) {
       console.error("Error removing user:", err);
@@ -300,7 +312,7 @@ export default function AccessControlPage() {
     <div className="space-y-6">
       <PageHeader
         title="Access Control"
-        description="Manage user accounts, roles, and their permissions."
+        description="Manage user accounts, roles, and their permissions. User passwords are not shown for security."
         actions={
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             <Button variant="outline" onClick={handleInviteNewUser} className="w-full sm:w-auto"> <UserPlus className="mr-2 h-4 w-4" /> Invite New User</Button>
@@ -313,7 +325,7 @@ export default function AccessControlPage() {
         <Card>
             <CardHeader>
             <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Users</CardTitle>
-            <CardDescription>List of all users in the system.</CardDescription>
+            <CardDescription>List of all users in the system. Passwords are managed by users and are not displayed.</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
             <div className="p-4 border-b">
@@ -383,14 +395,17 @@ export default function AccessControlPage() {
                                       <AlertDialogHeader>
                                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                         <AlertDialogDescription>
-                                          This action cannot be undone. This will permanently remove the user profile for "{user.name}" from Firestore. 
-                                          The Firebase Authentication account may still exist and would need to be removed separately (e.g. via Firebase console or Admin SDK for full deletion).
+                                          This action will remove the user profile "{user.name}" from the CMS (Firestore database). 
+                                          <span className="font-semibold block mt-2">
+                                            Important: This does <span className="underline">not</span> automatically disable or delete their Firebase Authentication account.
+                                            To fully prevent login, you must manually disable or delete their account in the Firebase Console.
+                                          </span>
                                         </AlertDialogDescription>
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                                         <AlertDialogAction onClick={() => handleDeleteUser(user.id, user.name)} className="bg-destructive hover:bg-destructive/90">
-                                          Remove Profile
+                                          Remove CMS Profile
                                         </AlertDialogAction>
                                       </AlertDialogFooter>
                                     </AlertDialogContent>
@@ -552,3 +567,5 @@ export default function AccessControlPage() {
     </div>
   );
 }
+
+    
