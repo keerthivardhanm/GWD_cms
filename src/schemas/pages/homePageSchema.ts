@@ -33,8 +33,6 @@ export type AccreditationLogoType = z.infer<typeof AccreditationLogoSchema>;
 export const ProgramItemSchema = z.object({
  imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
   alt: z.string().optional().default(''),
-  imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
-  alt: z.string().optional().default(''),
   title: z.string().optional().default(''),
   description: z.string().optional().default(''),
   btnLink: z.string().or(z.literal('')).optional().default(''), // Allow any string
@@ -60,15 +58,15 @@ export const CentreFacilitySchema = z.object({
   text: z.string().optional().default(''),
 })
 
-export const CentreItemSchema = z.object({
-  imgSrc: z.string().or(z.literal('')).optional().default(''),       // Image URL
-  alt: z.string().optional().default(''),                            // Alt text for image
-  name: z.string().optional().default(''),                           // Centre name
-  description: z.string().optional().default(''),                    // Short centre description
-  address: z.string().optional().default(''),                        // Full address
-  phone: z.string().optional().default(''),                          // Contact number
-  email: z.string().optional().default(''),                          // Contact email
-  btnLink: z.string().or(z.literal('')).optional().default(''),      // "View Details" link
+export const CentreItemSchema = z.object({ // This is for the Home Page's list of centres
+  imgSrc: z.string().url({ message: "Invalid image URL" }).or(z.literal('')).optional().default(''),
+  alt: z.string().optional().default(''),
+  name: z.string().optional().default(''),
+  description: z.string().optional().default(''),
+  address: z.string().optional().default(''),
+  phone: z.string().optional().default(''),
+  email: z.string().email({ message: "Invalid email format" }).or(z.literal('')).optional().default(''),
+  btnLink: z.string().or(z.literal('')).optional().default(''), // Link to the full centre detail page
 }).default({});
 
 export type CentreItemType = z.infer<typeof CentreItemSchema>;
@@ -92,14 +90,7 @@ export const HomePageContentSchema = z.object({
   }).optional().default({ counters: [] }),
   centres: z.object({
     sectionHeading: z.string().optional().default(''),
-    centres: z.array(CentreItemSchema).optional().default([]),
-  }).optional().default({ centres: [] }),
-  accreditations: z.object({
-    logos: z.array(AccreditationLogoSchema).optional().default([]),
-  }).optional().default({ logos: [] }),
-  globalPartnerships: z.object({
-    sectionHeading: z.string().optional().default(''),
-    centres: z.array(CentreItemSchema).optional().default([]),
+    centres: z.array(CentreItemSchema).optional().default([]), // Uses the updated CentreItemSchema
   }).optional().default({ centres: [] }),
   accreditations: z.object({
     logos: z.array(AccreditationLogoSchema).optional().default([]),
