@@ -9,13 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle, Trash2 } from 'lucide-react';
-import type { PageFormValues } from '../PageForm'; // Adjust if PageFormValues is defined elsewhere or use a more specific type for content
+import type { PageFormValues } from '../PageForm'; 
 import { CentreFacilitySchema } from '@/schemas/pages/centresOverviewPageSchema';
 
 interface CentreItemFormProps {
   centreIndex: number;
   removeCentre: (index: number) => void;
-  // We don't need to pass control, register, errors via props anymore due to useFormContext
 }
 
 // Helper to get nested errors
@@ -26,7 +25,6 @@ const getNestedError = (errors: any, path: string): any => {
 
 
 export function CentreItemForm({ centreIndex, removeCentre }: CentreItemFormProps) {
-  // Use useFormContext to access the parent form's methods and state
   const { control, register, formState: { errors } } = useFormContext<PageFormValues>();
 
   const facilitiesName = `content.centresList.${centreIndex}.facilities` as const;
@@ -35,7 +33,6 @@ export function CentreItemForm({ centreIndex, removeCentre }: CentreItemFormProp
     name: facilitiesName,
   });
 
-  // Construct base path for errors for this specific centre item
   const centreItemErrorBasePath = `content.centresList.${centreIndex}`;
 
   return (
@@ -142,3 +139,4 @@ export function CentreItemForm({ centreIndex, removeCentre }: CentreItemFormProp
   );
 }
 
+    
