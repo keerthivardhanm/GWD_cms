@@ -8,7 +8,7 @@ import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart";
 import { KeepNotes } from "@/components/dashboard/KeepNotes";
 import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed"; // Keep this for future if needed elsewhere
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Package, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity, UserPlus } from "lucide-react";
+import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Package, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity, UserPlus, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -70,13 +70,16 @@ export default function DashboardPage() {
   const [loadingGaData, setLoadingGaData] = useState(true);
   const [gaError, setGaError] = useState<string | null>(null); // Store only the message string for UI
 
+  const gaDashboardUrl = "https://analytics.google.com/analytics/web/?authuser=1#/p491858320/reports/reportinghub?params=_u..nav%3Dmaui";
+
+
   useEffect(() => {
     async function fetchDashboardData() {
       setLoadingMetrics(true);
       setLoadingRecentContent(true);
       setLoadingRecentAuditLogs(true);
       setLoadingGaData(true);
-      setGaError(null); // Reset GA error on new fetch attempt
+      setGaError(null); 
 
       try {
         // Fetch counts
@@ -162,14 +165,14 @@ export default function DashboardPage() {
         });
         setRecentAuditLogs(fetchedAuditLogs);
 
-        // Fetch GA Data
+        // Fetch GA Data (API)
         const gaResult = await fetchGaData();
         if (gaResult.error) {
-          setGaError(gaResult.error.message); // Store the message for UI display
-          // Conditional console logging
+          setGaError(gaResult.error.message); 
           const knownConfigErrors = ['MISSING_GA_PROPERTY_ID', 'MISSING_CREDENTIALS_STRING', 'INVALID_CREDENTIALS_JSON'];
+          // Only log to console if it's NOT one of the known configuration issues
           if (!knownConfigErrors.includes(gaResult.error.code)) {
-            console.error(`GA Data Fetch Error (${gaResult.error.code}): ${gaResult.error.message}`);
+             console.error(`GA Data Fetch Error (${gaResult.error.code}): ${gaResult.error.message}`);
           }
         } else {
           setGaData(gaResult);
@@ -177,7 +180,6 @@ export default function DashboardPage() {
         
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
-        // Set specific errors if needed, or a general one
       } finally {
         setLoadingMetrics(false);
         setLoadingRecentContent(false);
@@ -241,15 +243,10 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2 shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-             <BarChart3 className="h-5 w-5" /> Google Analytics Overview
+             <BarChart3 className="h-5 w-5" /> Google Analytics API Data
             </CardTitle>
             <CardDescription>
-              Insights from your Google Analytics property (Last 7 days).
-              <Button variant="link" size="sm" asChild className="ml-2 p-0 h-auto">
-                <a href="https://analytics.google.com/" target="_blank" rel="noopener noreferrer" >
-                  Open GA <ExternalLink className="ml-1 h-3 w-3" />
-                </a>
-              </Button>
+              Key insights from your Google Analytics property (Last 7 days, via API).
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -263,11 +260,11 @@ export default function DashboardPage() {
               <Card className="border-destructive bg-destructive/5 text-destructive">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <ShieldAlert className="h-5 w-5" /> GA Data Error
+                    <ShieldAlert className="h-5 w-5" /> GA Data API Error
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="font-medium">Failed to load Google Analytics data:</p>
+                  <p className="font-medium">Failed to load Google Analytics data via API:</p>
                   <p className="text-sm mb-2">{gaError}</p>
                   <p className="text-xs ">
                     Please ensure `GA_PROPERTY_ID` and `GOOGLE_APPLICATION_CREDENTIALS_JSON_STRING` 
@@ -302,14 +299,14 @@ export default function DashboardPage() {
                           </ul>
                         </ScrollArea>
                       ) : (
-                        <p className="text-sm text-muted-foreground">No top pages data available or no views recorded.</p>
+                        <p className="text-sm text-muted-foreground">No top pages data available or no views recorded via API.</p>
                       )}
                     </CardContent>
                 </Card>
               </div>
             )}
             {!loadingGaData && !gaError && !gaData && (
-                 <p className="p-4 text-center text-muted-foreground">No Google Analytics data available.</p>
+                 <p className="p-4 text-center text-muted-foreground">No Google Analytics data available via API.</p>
             )}
           </CardContent>
         </Card>
@@ -361,6 +358,37 @@ export default function DashboardPage() {
       </div>
 
       <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" /> Google Analytics Dashboard Access
+            </CardTitle>
+            <CardDescription>
+              Direct link to your Google Analytics dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-3 border border-amber-500 bg-amber-50 text-amber-700 rounded-md text-sm flex items-start">
+              <Info className="h-5 w-5 mr-2 mt-0.5 shrink-0"/>
+              <div>
+                Click the button below to open your Google Analytics dashboard in a new tab.
+                If you encounter issues accessing it (e.g., login screen, errors), it might be because:
+                <ul className="list-disc pl-5 mt-1">
+                  <li>You are not logged into the correct Google account in your browser.</li>
+                  <li>The Google account you are using does not have permission to view this GA Property.</li>
+                </ul>
+                 Ensure you have the necessary permissions and are logged into the appropriate Google account. Contact your administrator if you believe you should have access. The target Property ID for this link is `491858320`.
+              </div>
+            </div>
+            <Button asChild>
+              <a href={gaDashboardUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center">
+                Open Google Analytics <ExternalLink className="ml-2 h-4 w-4" />
+              </a>
+            </Button>
+          </CardContent>
+      </Card>
+
+
+      <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
         <CardHeader className="flex flex-row items-center justify-between">
             <div>
                 <CardTitle className="flex items-center gap-2">
@@ -407,3 +435,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+    

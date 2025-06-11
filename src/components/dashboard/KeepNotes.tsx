@@ -22,6 +22,7 @@ interface UserNote {
   title: string;
   summary?: string;
   createdAt: Timestamp;
+  // Add any other fields that might come from Firestore if they exist
 }
 
 export function KeepNotes() {
@@ -53,20 +54,27 @@ export function KeepNotes() {
     );
 
     const unsubscribe = onSnapshot(notesQuery, (querySnapshot) => {
-      const notesData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as UserNote));
+      const notesData = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          content: data.content || '',
+          title: data.title || 'Untitled Note',
+          summary: data.summary || '',
+          createdAt: data.createdAt, // This should be a Timestamp object
+        } as UserNote;
+      });
       setUserNotes(notesData);
       setLoadingNotes(false);
     }, (err) => {
       console.error("Error fetching notes:", err);
       setError("Failed to load existing notes.");
       setLoadingNotes(false);
+      toast({ title: "Error", description: "Could not load your notes.", variant: "destructive" });
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, toast]);
 
   const handleSummarize = async () => {
     if (!noteContent.trim()) {
@@ -107,10 +115,9 @@ export function KeepNotes() {
         title: generatedTitle || "Untitled Note",
         summary: generatedSummary,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(), // Though not strictly 'updated' yet, good practice
+        updatedAt: serverTimestamp(),
       });
       toast({ title: "Note Saved", description: "Your note has been saved." });
-      // Clear the form after saving
       setNoteContent("");
       setGeneratedTitle("");
       setGeneratedSummary("");
@@ -201,10 +208,10 @@ export function KeepNotes() {
               </div>
             )}
             {!loadingNotes && userNotes.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No notes saved yet.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">No notes saved yet. Create one above!</p>
             )}
             {!loadingNotes && userNotes.length > 0 && (
-              <ScrollArea className="h-[250px] space-y-3">
+              <ScrollArea className="h-[250px] space-y-3 pr-3">
                 {userNotes.map(note => (
                   <Card key={note.id} className="mb-3 bg-muted/30">
                     <CardHeader className="pb-2 pt-3 px-4">
@@ -233,7 +240,7 @@ export function KeepNotes() {
                           </AlertDialogContent>
                         </AlertDialog>
                       </div>
-                       {note.createdAt && <p className="text-xs text-muted-foreground pt-0.5">Saved: {note.createdAt.toDate().toLocaleDateString()}</p>}
+                       {note.createdAt && note.createdAt instanceof Timestamp && <p className="text-xs text-muted-foreground pt-0.5">Saved: {note.createdAt.toDate().toLocaleDateString()}</p>}
                     </CardHeader>
                     <CardContent className="px-4 pb-3">
                       {note.summary && (
@@ -251,4 +258,4 @@ export function KeepNotes() {
     </Card>
   );
 }
-
+    
