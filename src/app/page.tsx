@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { APP_NAME } from '@/lib/constants';
-import { ShieldCheck } from 'lucide-react'; // Changed from next/image
+import { ShieldCheck } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -20,9 +20,6 @@ export default function HomePage() {
         <div className="space-x-4">
           <Button asChild size="lg">
             <Link href="/login">Login to Your Account</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link href="/dashboard">Go to Dashboard</Link>
           </Button>
         </div>
         <p className="mt-12 text-sm text-muted-foreground">

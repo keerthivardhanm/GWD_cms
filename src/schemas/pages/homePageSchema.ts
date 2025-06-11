@@ -23,7 +23,16 @@ export const WhyChooseFeatureSchema = z.object({
 }).default({});
 export type WhyChooseFeatureType = z.infer<typeof WhyChooseFeatureSchema>;
 
+export const AccreditationLogoSchema = z.object({
+ imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
+ alt: z.string().optional().default(''),
+ name: z.string().optional().default(''),
+}).default({});
+export type AccreditationLogoType = z.infer<typeof AccreditationLogoSchema>;
+
 export const ProgramItemSchema = z.object({
+ imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
+  alt: z.string().optional().default(''),
   imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
   alt: z.string().optional().default(''),
   title: z.string().optional().default(''),
@@ -36,24 +45,6 @@ export const CounterItemSchema = z.object({
   value: z.union([z.number(), z.string()]).optional().default(''),
   label: z.string().optional().default(''),
 }).default({});
-export type CounterItemType = z.infer<typeof CounterItemSchema>;
-
-export const CentreItemSchema = z.object({
-  imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
-  alt: z.string().optional().default(''),
-  name: z.string().optional().default(''),
-  description: z.string().optional().default(''),
-  btnLink: z.string().or(z.literal('')).optional().default(''), // Allow any string
-}).default({});
-export type CentreItemType = z.infer<typeof CentreItemSchema>;
-
-export const AccreditationLogoSchema = z.object({
-  imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
-  alt: z.string().optional().default(''),
-  name: z.string().optional().default(''),
-}).default({});
-export type AccreditationLogoType = z.infer<typeof AccreditationLogoSchema>;
-
 export const GlobalPartnerSchema = z.object({
   imgSrc: z.string().or(z.literal('')).optional().default(''), // Allow any string
   alt: z.string().optional().default(''),
@@ -61,6 +52,26 @@ export const GlobalPartnerSchema = z.object({
   description: z.string().optional().default(''),
 }).default({});
 export type GlobalPartnerType = z.infer<typeof GlobalPartnerSchema>;
+
+export type CounterItemType = z.infer<typeof CounterItemSchema>;
+
+export const CentreFacilitySchema = z.object({
+  iconClass: z.string().optional().default(''),
+  text: z.string().optional().default(''),
+})
+
+export const CentreItemSchema = z.object({
+  imgSrc: z.string().or(z.literal('')).optional().default(''),       // Image URL
+  alt: z.string().optional().default(''),                            // Alt text for image
+  name: z.string().optional().default(''),                           // Centre name
+  description: z.string().optional().default(''),                    // Short centre description
+  address: z.string().optional().default(''),                        // Full address
+  phone: z.string().optional().default(''),                          // Contact number
+  email: z.string().optional().default(''),                          // Contact email
+  btnLink: z.string().or(z.literal('')).optional().default(''),      // "View Details" link
+}).default({});
+
+export type CentreItemType = z.infer<typeof CentreItemSchema>;
 
 export const HomePageContentSchema = z.object({
   heroSection: z.object({
@@ -80,6 +91,13 @@ export const HomePageContentSchema = z.object({
     counters: z.array(CounterItemSchema).optional().default([]),
   }).optional().default({ counters: [] }),
   centres: z.object({
+    sectionHeading: z.string().optional().default(''),
+    centres: z.array(CentreItemSchema).optional().default([]),
+  }).optional().default({ centres: [] }),
+  accreditations: z.object({
+    logos: z.array(AccreditationLogoSchema).optional().default([]),
+  }).optional().default({ logos: [] }),
+  globalPartnerships: z.object({
     sectionHeading: z.string().optional().default(''),
     centres: z.array(CentreItemSchema).optional().default([]),
   }).optional().default({ centres: [] }),
