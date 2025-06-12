@@ -19,7 +19,7 @@ import type { Page as PageData } from '@/app/(app)/pages/page';
 import type { ContentBlock } from '@/app/(app)/content-blocks/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { fetchGaData, type GaDataOutput } from '@/ai/flows/fetch-ga-data-flow';
+// import { fetchGaData, type GaDataOutput } from '@/ai/flows/fetch-ga-data-flow'; // Removed GA API Data Fetch
 
 
 const contentCreationData = [
@@ -52,23 +52,17 @@ interface AuditLogEntry {
   timestamp: string;
 }
 
-// Define a type for structured GA errors based on the flow's output
-type GaErrorType = {
-  code: string;
-  message: string;
-} | null;
-
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentItems, setRecentItems] = useState<RecentActivityItem[]>([]);
   const [recentAuditLogs, setRecentAuditLogs] = useState<AuditLogEntry[]>([]);
-  const [gaData, setGaData] = useState<GaDataOutput | null>(null);
+  // const [gaData, setGaData] = useState<GaDataOutput | null>(null); // Removed GA State
   const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [loadingRecentContent, setLoadingRecentContent] = useState(true);
   const [loadingRecentAuditLogs, setLoadingRecentAuditLogs] = useState(true);
-  const [loadingGaData, setLoadingGaData] = useState(true);
-  const [gaError, setGaError] = useState<string | null>(null); // Store only the message string for UI
+  // const [loadingGaData, setLoadingGaData] = useState(true); // Removed GA State
+  // const [gaError, setGaError] = useState<string | null>(null); // Removed GA State
 
   const gaDashboardUrl = "https://analytics.google.com/analytics/web/?authuser=1#/p491858320/reports/reportinghub?params=_u..nav%3Dmaui";
 
@@ -78,8 +72,8 @@ export default function DashboardPage() {
       setLoadingMetrics(true);
       setLoadingRecentContent(true);
       setLoadingRecentAuditLogs(true);
-      setLoadingGaData(true);
-      setGaError(null); 
+      // setLoadingGaData(true); // Removed GA loading
+      // setGaError(null);  // Removed GA error state
 
       try {
         // Fetch counts
@@ -165,18 +159,17 @@ export default function DashboardPage() {
         });
         setRecentAuditLogs(fetchedAuditLogs);
 
-        // Fetch GA Data (API)
-        const gaResult = await fetchGaData();
-        if (gaResult.error) {
-          setGaError(gaResult.error.message); 
-          const knownConfigErrors = ['MISSING_GA_PROPERTY_ID', 'MISSING_CREDENTIALS_STRING', 'INVALID_CREDENTIALS_JSON'];
-          // Only log to console if it's NOT one of the known configuration issues
-          if (!knownConfigErrors.includes(gaResult.error.code)) {
-             console.error(`GA Data Fetch Error (${gaResult.error.code}): ${gaResult.error.message}`);
-          }
-        } else {
-          setGaData(gaResult);
-        }
+        // Fetch GA Data (API) - REMOVED
+        // const gaResult = await fetchGaData();
+        // if (gaResult.error) {
+        //   setGaError(gaResult.error.message); 
+        //   const knownConfigErrors = ['MISSING_GA_PROPERTY_ID', 'MISSING_CREDENTIALS_STRING', 'INVALID_CREDENTIALS_JSON'];
+        //   if (!knownConfigErrors.includes(gaResult.error.code)) {
+        //      console.error(`GA Data Fetch Error (${gaResult.error.code}): ${gaResult.error.message}`);
+        //   }
+        // } else {
+        //   setGaData(gaResult);
+        // }
         
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -184,7 +177,7 @@ export default function DashboardPage() {
         setLoadingMetrics(false);
         setLoadingRecentContent(false);
         setLoadingRecentAuditLogs(false);
-        setLoadingGaData(false);
+        // setLoadingGaData(false); // Removed GA loading
       }
     }
     fetchDashboardData();
@@ -240,6 +233,8 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
+        {/* Google Analytics API Data Card - REMOVED */}
+        {/* 
         <Card className="lg:col-span-2 shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -310,8 +305,9 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        */}
         
-        <div className="space-y-6 lg:col-span-1">
+        <div className="space-y-6 lg:col-span-3"> {/* Changed col-span to 3 to take full width in this row */}
             <KeepNotes />
             <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
                 <CardHeader>
@@ -435,4 +431,6 @@ export default function DashboardPage() {
     </div>
   );
 }
+    
+
     

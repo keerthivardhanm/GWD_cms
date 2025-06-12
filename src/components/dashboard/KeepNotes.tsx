@@ -21,8 +21,8 @@ interface UserNote {
   content: string;
   title: string;
   summary?: string;
-  createdAt: Timestamp;
-  // Add any other fields that might come from Firestore if they exist
+  createdAt: Timestamp; // Expect Timestamp from Firestore
+  updatedAt?: Timestamp;
 }
 
 export function KeepNotes() {
@@ -40,7 +40,7 @@ export function KeepNotes() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !user.uid) {
       setUserNotes([]);
       setLoadingNotes(false);
       return;
@@ -61,7 +61,8 @@ export function KeepNotes() {
           content: data.content || '',
           title: data.title || 'Untitled Note',
           summary: data.summary || '',
-          createdAt: data.createdAt, // This should be a Timestamp object
+          createdAt: data.createdAt as Timestamp, // Ensure this is treated as a Timestamp
+          updatedAt: data.updatedAt as Timestamp,
         } as UserNote;
       });
       setUserNotes(notesData);
@@ -70,7 +71,7 @@ export function KeepNotes() {
       console.error("Error fetching notes:", err);
       setError("Failed to load existing notes.");
       setLoadingNotes(false);
-      toast({ title: "Error", description: "Could not load your notes.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not load your notes. Check Firestore rules.", variant: "destructive" });
     });
 
     return () => unsubscribe();
@@ -90,6 +91,7 @@ export function KeepNotes() {
     } catch (e) {
       console.error("Error summarizing note:", e);
       setError("Failed to generate summary. Please try again.");
+      toast({ title: "Summarization Failed", description: "Could not generate summary.", variant: "destructive" });
     } finally {
       setIsSummarizing(false);
     }
@@ -110,7 +112,7 @@ export function KeepNotes() {
 
     try {
       await addDoc(collection(db, "userNotes"), {
-        userId: user.uid,
+        userId: user.uid, // Ensure userId is saved
         content: noteContent,
         title: generatedTitle || "Untitled Note",
         summary: generatedSummary,
@@ -207,7 +209,10 @@ export function KeepNotes() {
                 <p className="ml-2 text-sm text-muted-foreground">Loading notes...</p>
               </div>
             )}
-            {!loadingNotes && userNotes.length === 0 && (
+            {!loadingNotes && !user && (
+                 <p className="text-sm text-muted-foreground text-center py-4">Please log in to see your notes.</p>
+            )}
+            {!loadingNotes && user && userNotes.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">No notes saved yet. Create one above!</p>
             )}
             {!loadingNotes && userNotes.length > 0 && (
@@ -258,4 +263,6 @@ export function KeepNotes() {
     </Card>
   );
 }
+    
+
     
