@@ -4,41 +4,26 @@
 import Link from 'next/link';
 import { PageHeader } from "@/components/shared/PageHeader";
 import { KeyMetricCard } from "@/components/dashboard/KeyMetricsCard";
-import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart";
+import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart"; // For bar chart
+import { PageStatusPieChart } from "@/components/dashboard/PageStatusPieChart"; // New pie chart component
 import { KeepNotes } from "@/components/dashboard/KeepNotes";
-import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed"; // Keep this for future if needed elsewhere
+import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed"; 
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Package, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity, UserPlus, Info } from "lucide-react";
+import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity, UserPlus, Info, PieChart as PieChartIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, orderBy, limit, Timestamp, getCountFromServer } from 'firebase/firestore';
-import type { Page as PageData } from '@/app/(app)/pages/page';
+import type { Page as PageData, PageStatus } from '@/app/(app)/pages/page';
 import type { ContentBlock } from '@/app/(app)/content-blocks/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-// import { fetchGaData, type GaDataOutput } from '@/ai/flows/fetch-ga-data-flow'; // Removed GA API Data Fetch
-
-
-const contentCreationData = [
-  { date: "2024-07-01", pages: 5, blocks: 12, files: 3 },
-  { date: "2024-07-08", pages: 3, blocks: 8, files: 5 },
-  { date: "2024-07-15", pages: 7, blocks: 15, files: 2 },
-  { date: "2024-07-22", pages: 4, blocks: 10, files: 6 },
-];
-
-const userEngagementData = [
-  { date: "2024-07-01", activeUsers: 150, comments: 20 },
-  { date: "2024-07-08", activeUsers: 180, comments: 25 },
-  { date: "2024-07-15", activeUsers: 165, comments: 18 },
-  { date: "2024-07-22", activeUsers: 200, comments: 30 },
-];
 
 interface DashboardMetrics {
   totalPages: number;
-  totalFiles: number;
+  totalFiles: number; // Assuming mediaItems for files
   totalContentBlocks: number;
   totalUsers: number;
 }
@@ -52,19 +37,38 @@ interface AuditLogEntry {
   timestamp: string;
 }
 
+interface PageStatusData {
+  name: PageStatus;
+  value: number;
+  fill: string; // For pie chart cell color
+}
+
+interface ContentTypeOverviewData {
+  type: string;
+  count: number;
+}
+
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentItems, setRecentItems] = useState<RecentActivityItem[]>([]);
   const [recentAuditLogs, setRecentAuditLogs] = useState<AuditLogEntry[]>([]);
-  // const [gaData, setGaData] = useState<GaDataOutput | null>(null); // Removed GA State
+  const [pageStatusData, setPageStatusData] = useState<PageStatusData[]>([]);
+  const [contentTypeData, setContentTypeData] = useState<ContentTypeOverviewData[]>([]);
+
   const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [loadingRecentContent, setLoadingRecentContent] = useState(true);
   const [loadingRecentAuditLogs, setLoadingRecentAuditLogs] = useState(true);
-  // const [loadingGaData, setLoadingGaData] = useState(true); // Removed GA State
-  // const [gaError, setGaError] = useState<string | null>(null); // Removed GA State
+  const [loadingChartData, setLoadingChartData] = useState(true);
 
   const gaDashboardUrl = "https://analytics.google.com/analytics/web/?authuser=1#/p491858320/reports/reportinghub?params=_u..nav%3Dmaui";
+
+  const statusColors: Record<PageStatus, string> = {
+    Draft: "hsl(var(--chart-1))", // Example color
+    Published: "hsl(var(--chart-2))",
+    Review: "hsl(var(--chart-3))",
+    // Add other statuses if they exist
+  };
 
 
   useEffect(() => {
@@ -72,8 +76,7 @@ export default function DashboardPage() {
       setLoadingMetrics(true);
       setLoadingRecentContent(true);
       setLoadingRecentAuditLogs(true);
-      // setLoadingGaData(true); // Removed GA loading
-      // setGaError(null);  // Removed GA error state
+      setLoadingChartData(true);
 
       try {
         // Fetch counts
@@ -82,20 +85,46 @@ export default function DashboardPage() {
         const blocksCol = collection(db, "contentBlocks");
         const usersCol = collection(db, "users");
 
-        const [pagesSnapshot, filesSnapshot, blocksSnapshot, usersSnapshot] = await Promise.all([
+        const [pagesSnapshot, filesSnapshot, blocksSnapshot, usersSnapshot, allPagesDocs] = await Promise.all([
           getCountFromServer(pagesCol),
           getCountFromServer(filesCol),
           getCountFromServer(blocksCol),
           getCountFromServer(usersCol),
+          getDocs(pagesCol), // Fetch all page documents for status chart
         ]);
         
-        setMetrics({
+        const fetchedMetrics = {
           totalPages: pagesSnapshot.data().count,
           totalFiles: filesSnapshot.data().count,
           totalContentBlocks: blocksSnapshot.data().count,
           totalUsers: usersSnapshot.data().count,
-        });
+        };
+        setMetrics(fetchedMetrics);
         
+        // Prepare data for Page Status Pie Chart
+        const statusCounts: Record<PageStatus, number> = { Draft: 0, Published: 0, Review: 0 };
+        allPagesDocs.forEach(doc => {
+          const page = doc.data() as PageData;
+          if (page.status && statusCounts[page.status] !== undefined) {
+            statusCounts[page.status]++;
+          } else {
+            statusCounts.Draft++; // Default to Draft if status is missing or unknown
+          }
+        });
+        const pieData = Object.entries(statusCounts).map(([name, value]) => ({
+          name: name as PageStatus,
+          value,
+          fill: statusColors[name as PageStatus] || statusColors.Draft,
+        }));
+        setPageStatusData(pieData);
+
+        // Prepare data for Content Type Overview Bar Chart
+        setContentTypeData([
+          { type: 'Pages', count: fetchedMetrics.totalPages },
+          { type: 'Blocks', count: fetchedMetrics.totalContentBlocks },
+          { type: 'Users', count: fetchedMetrics.totalUsers },
+          { type: 'Media', count: fetchedMetrics.totalFiles },
+        ]);
 
         // Fetch recent content items
         const recentPagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc"), limit(3));
@@ -141,7 +170,6 @@ export default function DashboardPage() {
         });
         setRecentItems(fetchedRecentItems.slice(0, 5));
         
-
         // Fetch recent audit logs
         const auditLogsQuery = query(collection(db, "auditLogs"), orderBy("timestamp", "desc"), limit(5));
         const auditLogsSnapshot = await getDocs(auditLogsQuery);
@@ -158,18 +186,6 @@ export default function DashboardPage() {
             };
         });
         setRecentAuditLogs(fetchedAuditLogs);
-
-        // Fetch GA Data (API) - REMOVED
-        // const gaResult = await fetchGaData();
-        // if (gaResult.error) {
-        //   setGaError(gaResult.error.message); 
-        //   const knownConfigErrors = ['MISSING_GA_PROPERTY_ID', 'MISSING_CREDENTIALS_STRING', 'INVALID_CREDENTIALS_JSON'];
-        //   if (!knownConfigErrors.includes(gaResult.error.code)) {
-        //      console.error(`GA Data Fetch Error (${gaResult.error.code}): ${gaResult.error.message}`);
-        //   }
-        // } else {
-        //   setGaData(gaResult);
-        // }
         
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -177,7 +193,7 @@ export default function DashboardPage() {
         setLoadingMetrics(false);
         setLoadingRecentContent(false);
         setLoadingRecentAuditLogs(false);
-        // setLoadingGaData(false); // Removed GA loading
+        setLoadingChartData(false);
       }
     }
     fetchDashboardData();
@@ -209,105 +225,28 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <AnalyticsChart 
-          title="Content Creation Trends" 
-          description="Pages, blocks, and files created per week (Placeholder)."
-          data={contentCreationData}
-          dataKeyX="date"
-          dataKeysY={[
-            { key: "pages", name: "Pages", color: "hsl(var(--chart-1))" },
-            { key: "blocks", name: "Blocks", color: "hsl(var(--chart-2))" },
-            { key: "files", name: "Files", color: "hsl(var(--chart-3))" },
-          ]}
-        />
-        <AnalyticsChart 
-          title="User Engagement" 
-          description="Active users and comments per week (Placeholder)."
-          data={userEngagementData}
-          dataKeyX="date"
-          dataKeysY={[
-            { key: "activeUsers", name: "Active Users", color: "hsl(var(--chart-4))" },
-            { key: "comments", name: "Comments", color: "hsl(var(--chart-5))" },
-          ]}
-        />
+        {loadingChartData ? (
+            <Card><CardContent className="flex items-center justify-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-2">Loading chart data...</p></CardContent></Card>
+        ) : (
+             <PageStatusPieChart data={pageStatusData} />
+        )}
+       {loadingChartData || !metrics ? (
+            <Card><CardContent className="flex items-center justify-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-2">Loading chart data...</p></CardContent></Card>
+        ) : (
+            <AnalyticsChart 
+              title="Content Type Overview" 
+              description="Total count of main content types in the CMS."
+              data={contentTypeData}
+              dataKeyX="type"
+              dataKeysY={[
+                { key: "count", name: "Count", color: "hsl(var(--chart-4))" },
+              ]}
+            />
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Google Analytics API Data Card - REMOVED */}
-        {/* 
-        <Card className="lg:col-span-2 shadow-sm hover:shadow-md transition-shadow duration-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-             <BarChart3 className="h-5 w-5" /> Google Analytics API Data
-            </CardTitle>
-            <CardDescription>
-              Key insights from your Google Analytics property (Last 7 days, via API).
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loadingGaData && (
-              <div className="flex items-center justify-center p-10">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="ml-2">Loading Google Analytics data...</p>
-              </div>
-            )}
-            {gaError && !loadingGaData && (
-              <Card className="border-destructive bg-destructive/5 text-destructive">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <ShieldAlert className="h-5 w-5" /> GA Data API Error
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="font-medium">Failed to load Google Analytics data via API:</p>
-                  <p className="text-sm mb-2">{gaError}</p>
-                  <p className="text-xs ">
-                    Please ensure `GA_PROPERTY_ID` and `GOOGLE_APPLICATION_CREDENTIALS_JSON_STRING` 
-                    are correctly set in your `.env.local` file (restart server after changes). 
-                    Also, verify the service account has 'Viewer' permission on the GA property in Google Analytics admin settings.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-            {!loadingGaData && !gaError && gaData && (
-              <div className="space-y-6">
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <KeyMetricCard title="Active Users (7d)" value={gaData.activeUsers || '0'} icon={Users} />
-                  <KeyMetricCard title="New Users (7d)" value={gaData.newUsers || '0'} icon={UserPlus} />
-                  <KeyMetricCard title="Page Views (7d)" value={gaData.screenPageViews || '0'} icon={Activity} />
-                </div>
-                
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base">Top Pages (Last 7 Days)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {gaData.topPages && gaData.topPages.length > 0 ? (
-                        <ScrollArea className="h-[150px]">
-                          <ul className="space-y-2 text-sm">
-                            {gaData.topPages.map(p => (
-                              <li key={p.pagePath} className="flex justify-between items-center">
-                                <span className="truncate" title={p.pagePath}>{p.pagePath}</span>
-                                <Badge variant="secondary">{p.screenPageViews} views</Badge>
-                              </li>
-                            ))}
-                          </ul>
-                        </ScrollArea>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No top pages data available or no views recorded via API.</p>
-                      )}
-                    </CardContent>
-                </Card>
-              </div>
-            )}
-            {!loadingGaData && !gaError && !gaData && (
-                 <p className="p-4 text-center text-muted-foreground">No Google Analytics data available via API.</p>
-            )}
-          </CardContent>
-        </Card>
-        */}
-        
-        <div className="space-y-6 lg:col-span-3"> {/* Changed col-span to 3 to take full width in this row */}
+        <div className="space-y-6 lg:col-span-3">
             <KeepNotes />
             <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
                 <CardHeader>
@@ -383,7 +322,6 @@ export default function DashboardPage() {
           </CardContent>
       </Card>
 
-
       <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
         <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -410,7 +348,7 @@ export default function DashboardPage() {
                     {recentAuditLogs.map((log) => (
                     <div key={log.id} className="flex items-start gap-3">
                         <Avatar className="h-9 w-9 mt-1">
-                            <AvatarImage src={`https://placehold.co/40x40.png?text=${log.userName.substring(0,1)}`} alt={log.userName} data-ai-hint="user avatar" />
+                            <AvatarImage src={`https://placehold.co/40x40.png?text=${log.userName.substring(0,1)}`} alt={log.userName} data-ai-hint="user avatar"/>
                             <AvatarFallback>{log.userName.substring(0,2).toUpperCase()}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
@@ -431,6 +369,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-    
-
-    
