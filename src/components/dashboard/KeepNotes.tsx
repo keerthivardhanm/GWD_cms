@@ -3,273 +3,180 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from '@/components/ui/input';
 import { Label } from "@/components/ui/label";
-import { StickyNote, Sparkles, Loader2, Save, Trash2, AlertTriangle } from "lucide-react";
-import { summarizeNote, SummarizeNoteOutput } from "@/ai/flows/summarize-note-flow";
-import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, deleteDoc, doc, Timestamp } from 'firebase/firestore';
+import { Checkbox } from "@/components/ui/checkbox";
+import { ListChecks, Trash2, PlusCircle } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-interface UserNote {
+interface Task {
   id: string;
-  content: string;
-  title: string;
-  summary?: string;
-  createdAt: Timestamp; // Expect Timestamp from Firestore
-  updatedAt?: Timestamp;
+  text: string;
+  completed: boolean;
+  createdAt: number;
 }
 
+const LOCAL_STORAGE_KEY = 'dashboardUserTasks';
+
 export function KeepNotes() {
-  const [noteContent, setNoteContent] = useState("");
-  const [generatedTitle, setGeneratedTitle] = useState("");
-  const [generatedSummary, setGeneratedSummary] = useState("");
-  const [isSummarizing, setIsSummarizing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [newTaskText, setNewTaskText] = useState("");
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
 
-  const [userNotes, setUserNotes] = useState<UserNote[]>([]);
-  const [loadingNotes, setLoadingNotes] = useState(true);
-
-  const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!user || !user.uid) {
-      setUserNotes([]);
-      setLoadingNotes(false);
-      return;
-    }
-
-    setLoadingNotes(true);
-    const notesQuery = query(
-      collection(db, "userNotes"),
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
-    );
-
-    const unsubscribe = onSnapshot(notesQuery, (querySnapshot) => {
-      const notesData = querySnapshot.docs.map(docSnap => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          content: data.content || '',
-          title: data.title || 'Untitled Note',
-          summary: data.summary || '',
-          createdAt: data.createdAt as Timestamp, // Ensure this is treated as a Timestamp
-          updatedAt: data.updatedAt as Timestamp,
-        } as UserNote;
-      });
-      setUserNotes(notesData);
-      setError(null); // Clear error on successful fetch
-      setLoadingNotes(false);
-    }, (err: any) => { // Added type 'any' for err to access err.message
-      console.error("Error fetching notes from Firestore:", err);
-      // Check if the error message from Firestore suggests a missing index
-      let detailedErrorMessage = "Could not load your notes. Please check your internet connection and Firestore setup.";
-      if (err.message && (err.message.toLowerCase().includes("index") || err.message.toLowerCase().includes("requires an index"))) {
-        detailedErrorMessage = "Failed to load notes. A Firestore index might be required. Please check the browser console for a link to create it.";
-      } else if (err.message && err.message.toLowerCase().includes("permission_denied")) {
-        detailedErrorMessage = "Failed to load notes due to permission issues. Please check your Firestore security rules.";
+    try {
+      const storedTasks = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (storedTasks) {
+        setTasks(JSON.parse(storedTasks));
       }
-      
-      setError("Failed to load existing notes."); // This sets the UI error message
-      setLoadingNotes(false);
-      toast({ title: "Error Loading Notes", description: detailedErrorMessage, variant: "destructive", duration: 10000 });
+    } catch (error) {
+      console.error("Error loading tasks from localStorage:", error);
+      toast({ title: "Error", description: "Could not load tasks from local storage.", variant: "destructive" });
+    }
+    setIsLoadingTasks(false);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!isLoadingTasks) {
+        try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(tasks));
+        } catch (error) {
+            console.error("Error saving tasks to localStorage:", error);
+            toast({ title: "Error", description: "Could not save tasks to local storage.", variant: "destructive" });
+        }
+    }
+  }, [tasks, isLoadingTasks, toast]);
+
+  const handleAddTask = (e?: React.FormEvent<HTMLFormElement>) => {
+    if (e) e.preventDefault();
+    if (!newTaskText.trim()) {
+      toast({ title: "Cannot Add Task", description: "Task text cannot be empty.", variant: "destructive" });
+      return;
+    }
+
+    const newTask: Task = {
+      id: crypto.randomUUID(),
+      text: newTaskText.trim(),
+      completed: false,
+      createdAt: Date.now(),
+    };
+    setTasks(prevTasks => [newTask, ...prevTasks]);
+    setNewTaskText("");
+    toast({ title: "Task Added", description: `"${newTask.text.substring(0,20)}..." added.`});
+  };
+
+  const handleToggleTask = (taskId: string) => {
+    setTasks(prevTasks =>
+      prevTasks.map(task =>
+        task.id === taskId ? { ...task, completed: !task.completed } : task
+      )
+    );
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    const taskToDelete = tasks.find(t => t.id === taskId);
+    setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+    if (taskToDelete) {
+        toast({ title: "Task Deleted", description: `"${taskToDelete.text.substring(0,20)}..." removed.` });
+    }
+  };
+  
+  const sortedTasks = React.useMemo(() => {
+    return [...tasks].sort((a, b) => {
+      if (a.completed === b.completed) {
+        return b.createdAt - a.createdAt;
+      }
+      return a.completed ? 1 : -1;
     });
-
-    return () => unsubscribe();
-  }, [user, toast]);
-
-  const handleSummarize = async () => {
-    if (!noteContent.trim()) {
-      setError("Please enter some content for the note first.");
-      return;
-    }
-    setIsSummarizing(true);
-    setError(null);
-    try {
-      const result: SummarizeNoteOutput = await summarizeNote({ noteContent });
-      setGeneratedTitle(result.title);
-      setGeneratedSummary(result.summary);
-    } catch (e) {
-      console.error("Error summarizing note:", e);
-      setError("Failed to generate summary. Please try again.");
-      toast({ title: "Summarization Failed", description: "Could not generate summary.", variant: "destructive" });
-    } finally {
-      setIsSummarizing(false);
-    }
-  };
-
-  const handleSaveNote = async () => {
-    if (!user) {
-      toast({ title: "Error", description: "You must be logged in to save notes.", variant: "destructive" });
-      return;
-    }
-    if (!noteContent.trim() && !generatedTitle.trim()) {
-      toast({ title: "Cannot Save", description: "Please enter some content or generate/enter a title for the note.", variant: "destructive" });
-      return;
-    }
-
-    setIsSaving(true);
-    setError(null);
-
-    try {
-      await addDoc(collection(db, "userNotes"), {
-        userId: user.uid, // Ensure userId is saved
-        content: noteContent,
-        title: generatedTitle || "Untitled Note",
-        summary: generatedSummary,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      toast({ title: "Note Saved", description: "Your note has been saved." });
-      setNoteContent("");
-      setGeneratedTitle("");
-      setGeneratedSummary("");
-    } catch (e) {
-      console.error("Error saving note:", e);
-      setError("Failed to save note. Please try again.");
-      toast({ title: "Save Failed", description: "Could not save your note.", variant: "destructive" });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDeleteNote = async (noteId: string) => {
-    if (!user) return;
-    try {
-      await deleteDoc(doc(db, "userNotes", noteId));
-      toast({ title: "Note Deleted", description: "The note has been removed."});
-    } catch (e) {
-      console.error("Error deleting note:", e);
-      toast({ title: "Delete Failed", description: "Could not delete the note.", variant: "destructive"});
-    }
-  };
+  }, [tasks]);
 
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 lg:col-span-1">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <StickyNote className="h-5 w-5" />
-          Keep Notes
+          <ListChecks className="h-5 w-5" />
+          My Tasks
         </CardTitle>
-        <CardDescription>Jot down quick tasks or reminders. Use AI to summarize and title them! Notes are saved per user.</CardDescription>
+        <CardDescription>A simple to-do list. Tasks are stored in your browser.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <Textarea
-            placeholder="Type your new note here..."
-            className="min-h-[100px] resize-none"
-            value={noteContent}
-            onChange={(e) => setNoteContent(e.target.value)}
-            disabled={isSaving || isSummarizing}
-          />
-          {generatedTitle && (
-            <div className="space-y-1">
-              <Label htmlFor="generatedTitle">AI Suggested Title (Editable):</Label>
-              <Input id="generatedTitle" value={generatedTitle} onChange={e => setGeneratedTitle(e.target.value)} placeholder="AI generated title" disabled={isSaving || isSummarizing} />
+        <form onSubmit={handleAddTask} className="space-y-3 mb-6">
+          <div>
+            <Label htmlFor="newTaskText" className="sr-only">New Task</Label>
+            <div className="flex gap-2">
+              <Input
+                id="newTaskText"
+                placeholder="Add a new task..."
+                value={newTaskText}
+                onChange={(e) => setNewTaskText(e.target.value)}
+              />
+              <Button type="submit" size="icon" aria-label="Add Task">
+                <PlusCircle className="h-5 w-5" />
+              </Button>
             </div>
-          )}
-          {generatedSummary && (
-            <div className="space-y-1">
-              <Label htmlFor="generatedSummary">AI Suggested Summary:</Label>
-              <Textarea id="generatedSummary" value={generatedSummary} readOnly className="min-h-[60px] bg-muted/50" disabled={isSaving || isSummarizing} />
-            </div>
-          )}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button
-              type="button"
-              onClick={handleSaveNote}
-              disabled={isSaving || isSummarizing || (!noteContent.trim() && !generatedTitle.trim())}
-              className="w-full sm:w-auto"
-            >
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Save New Note
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleSummarize}
-              disabled={isSummarizing || isSaving || !noteContent.trim()}
-              className="w-full sm:w-auto"
-            >
-              {isSummarizing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="mr-2 h-4 w-4" />
-              )}
-              Generate Summary & Title
-            </Button>
           </div>
+        </form>
 
-          {error && <p className="text-sm text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4"/>{error}</p>}
-
-          <div className="mt-6 pt-4 border-t">
-            <h3 className="text-md font-semibold mb-2">Your Saved Notes:</h3>
-            {loadingNotes && (
-              <div className="flex items-center justify-center p-4">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <p className="ml-2 text-sm text-muted-foreground">Loading notes...</p>
-              </div>
-            )}
-            {!loadingNotes && !user && (
-                 <p className="text-sm text-muted-foreground text-center py-4">Please log in to see your notes.</p>
-            )}
-            {!loadingNotes && user && userNotes.length === 0 && !error && (
-              <p className="text-sm text-muted-foreground text-center py-4">No notes saved yet. Create one above!</p>
-            )}
-            {!loadingNotes && userNotes.length > 0 && (
-              <ScrollArea className="h-[250px] space-y-3 pr-3">
-                {userNotes.map(note => (
-                  <Card key={note.id} className="mb-3 bg-muted/30">
-                    <CardHeader className="pb-2 pt-3 px-4">
-                      <div className="flex justify-between items-start">
-                        <CardTitle className="text-base">{note.title}</CardTitle>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
-                               <Trash2 className="h-4 w-4" />
-                               <span className="sr-only">Delete note</span>
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Note: "{note.title}"?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. The note will be permanently deleted.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteNote(note.id)} className="bg-destructive hover:bg-destructive/90">
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                       {note.createdAt && note.createdAt instanceof Timestamp && <p className="text-xs text-muted-foreground pt-0.5">Saved: {note.createdAt.toDate().toLocaleDateString()}</p>}
-                    </CardHeader>
-                    <CardContent className="px-4 pb-3">
-                      {note.summary && (
-                        <p className="text-xs text-muted-foreground italic mb-1">Summary: {note.summary}</p>
-                      )}
-                      <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </ScrollArea>
-            )}
-          </div>
+        <div className="mt-2 pt-2 border-t">
+          <h3 className="text-md font-semibold mb-2 text-muted-foreground">Your Tasks:</h3>
+          {isLoadingTasks && (
+            <p className="text-sm text-muted-foreground text-center py-4">Loading tasks...</p>
+          )}
+          {!isLoadingTasks && tasks.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">No tasks yet. Add one above!</p>
+          )}
+          {!isLoadingTasks && tasks.length > 0 && (
+            <ScrollArea className="h-[280px] space-y-2 pr-3">
+              {sortedTasks.map(task => (
+                <div key={task.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-b-0 animate-in fade-in-50 duration-300">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Checkbox
+                      id={`task-${task.id}`}
+                      checked={task.completed}
+                      onCheckedChange={() => handleToggleTask(task.id)}
+                      aria-label={task.completed ? `Mark task '${task.text}' as incomplete` : `Mark task '${task.text}' as complete`}
+                    />
+                    <Label
+                      htmlFor={`task-${task.id}`}
+                      className={`flex-1 truncate cursor-pointer ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
+                      title={task.text}
+                    >
+                      {task.text}
+                    </Label>
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0">
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete task {task.text}</span>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Task: "{task.text.substring(0,30)}{task.text.length > 30 ? '...' : ''}"?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. The task will be permanently deleted from your browser storage.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteTask(task.id)} className="bg-destructive hover:bg-destructive/90">
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              ))}
+            </ScrollArea>
+          )}
         </div>
       </CardContent>
     </Card>
   );
 }
-    
