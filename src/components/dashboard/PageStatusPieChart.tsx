@@ -58,11 +58,12 @@ export function PageStatusPieChart({ data }: PageStatusPieChartProps) {
               nameKey="name"
               label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }) => {
                 const RADIAN = Math.PI / 180;
-                const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                // Adjust label position slightly if needed, e.g., move further from center
+                const radius = innerRadius + (outerRadius - innerRadius) * 0.6; // Increased multiplier for positioning
                 const x = cx + radius * Math.cos(-midAngle * RADIAN);
                 const y = cy + radius * Math.sin(-midAngle * RADIAN);
                 return (
-                  <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="12px">
+                  <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="12px" fontWeight="medium">
                     {`${name} (${value})`}
                   </text>
                 );
