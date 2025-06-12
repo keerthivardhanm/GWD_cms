@@ -66,12 +66,21 @@ export function KeepNotes() {
         } as UserNote;
       });
       setUserNotes(notesData);
+      setError(null); // Clear error on successful fetch
       setLoadingNotes(false);
-    }, (err) => {
-      console.error("Error fetching notes:", err);
-      setError("Failed to load existing notes.");
+    }, (err: any) => { // Added type 'any' for err to access err.message
+      console.error("Error fetching notes from Firestore:", err);
+      // Check if the error message from Firestore suggests a missing index
+      let detailedErrorMessage = "Could not load your notes. Please check your internet connection and Firestore setup.";
+      if (err.message && (err.message.toLowerCase().includes("index") || err.message.toLowerCase().includes("requires an index"))) {
+        detailedErrorMessage = "Failed to load notes. A Firestore index might be required. Please check the browser console for a link to create it.";
+      } else if (err.message && err.message.toLowerCase().includes("permission_denied")) {
+        detailedErrorMessage = "Failed to load notes due to permission issues. Please check your Firestore security rules.";
+      }
+      
+      setError("Failed to load existing notes."); // This sets the UI error message
       setLoadingNotes(false);
-      toast({ title: "Error", description: "Could not load your notes. Check Firestore rules.", variant: "destructive" });
+      toast({ title: "Error Loading Notes", description: detailedErrorMessage, variant: "destructive", duration: 10000 });
     });
 
     return () => unsubscribe();
@@ -212,7 +221,7 @@ export function KeepNotes() {
             {!loadingNotes && !user && (
                  <p className="text-sm text-muted-foreground text-center py-4">Please log in to see your notes.</p>
             )}
-            {!loadingNotes && user && userNotes.length === 0 && (
+            {!loadingNotes && user && userNotes.length === 0 && !error && (
               <p className="text-sm text-muted-foreground text-center py-4">No notes saved yet. Create one above!</p>
             )}
             {!loadingNotes && userNotes.length > 0 && (
@@ -263,6 +272,4 @@ export function KeepNotes() {
     </Card>
   );
 }
-    
-
     
