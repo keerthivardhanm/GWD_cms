@@ -64,10 +64,9 @@ export default function DashboardPage() {
   const gaDashboardUrl = "https://analytics.google.com/analytics/web/?authuser=1#/p491858320/reports/reportinghub?params=_u..nav%3Dmaui";
 
   const statusColors: Record<PageStatus, string> = {
-    Draft: "hsl(var(--chart-1))", // Example color
+    Draft: "hsl(var(--chart-1))", 
     Published: "hsl(var(--chart-2))",
     Review: "hsl(var(--chart-3))",
-    // Add other statuses if they exist
   };
 
 
@@ -79,7 +78,6 @@ export default function DashboardPage() {
       setLoadingChartData(true);
 
       try {
-        // Fetch counts
         const pagesCol = collection(db, "pages");
         const filesCol = collection(db, "mediaItems"); 
         const blocksCol = collection(db, "contentBlocks");
@@ -90,7 +88,7 @@ export default function DashboardPage() {
           getCountFromServer(filesCol),
           getCountFromServer(blocksCol),
           getCountFromServer(usersCol),
-          getDocs(pagesCol), // Fetch all page documents for status chart
+          getDocs(pagesCol), 
         ]);
         
         const fetchedMetrics = {
@@ -101,14 +99,13 @@ export default function DashboardPage() {
         };
         setMetrics(fetchedMetrics);
         
-        // Prepare data for Page Status Pie Chart
         const statusCounts: Record<PageStatus, number> = { Draft: 0, Published: 0, Review: 0 };
         allPagesDocs.forEach(doc => {
           const page = doc.data() as PageData;
           if (page.status && statusCounts[page.status] !== undefined) {
             statusCounts[page.status]++;
           } else {
-            statusCounts.Draft++; // Default to Draft if status is missing or unknown
+            statusCounts.Draft++; 
           }
         });
         const pieData = Object.entries(statusCounts).map(([name, value]) => ({
@@ -118,7 +115,6 @@ export default function DashboardPage() {
         }));
         setPageStatusData(pieData);
 
-        // Prepare data for Content Type Overview Bar Chart
         setContentTypeData([
           { type: 'Pages', count: fetchedMetrics.totalPages },
           { type: 'Blocks', count: fetchedMetrics.totalContentBlocks },
@@ -126,7 +122,6 @@ export default function DashboardPage() {
           { type: 'Media', count: fetchedMetrics.totalFiles },
         ]);
 
-        // Fetch recent content items
         const recentPagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc"), limit(3));
         const recentBlocksQuery = query(collection(db, "contentBlocks"), orderBy("updatedAt", "desc"), limit(2));
 
@@ -170,7 +165,6 @@ export default function DashboardPage() {
         });
         setRecentItems(fetchedRecentItems.slice(0, 5));
         
-        // Fetch recent audit logs
         const auditLogsQuery = query(collection(db, "auditLogs"), orderBy("timestamp", "desc"), limit(5));
         const auditLogsSnapshot = await getDocs(auditLogsQuery);
         const fetchedAuditLogs = auditLogsSnapshot.docs.map(doc => {
@@ -245,82 +239,54 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-3">
-            <KeepNotes />
-            <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileClock className="h-5 w-5" />
-                        Recently Modified Content
-                    </CardTitle>
-                    <CardDescription>Quick access to recently updated items in the CMS.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {loadingRecentContent ? (
-                        <div className="flex justify-center items-center h-20">
-                            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      <div className="grid gap-6 md:grid-cols-2">
+        <div> {/* Column 1 for Tasks */}
+          <KeepNotes />
+        </div>
+        <div> {/* Column 2 for Recent Content */}
+          <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileClock className="h-5 w-5" />
+                Recently Modified Content
+              </CardTitle>
+              <CardDescription>Quick access to recently updated items in the CMS.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingRecentContent ? (
+                <div className="flex justify-center items-center h-20">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : recentItems.length > 0 ? (
+                <div className="space-y-2">
+                  {recentItems.map((item) => {
+                    const ItemIcon = item.icon;
+                    return (
+                      <div key={item.id} className="flex items-center justify-between py-3 border-b last:border-b-0">
+                        <div className="flex items-center gap-3">
+                          <ItemIcon className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <Link href={item.url} className="font-medium text-sm hover:underline">{item.title}</Link>
+                            <div className="text-xs text-muted-foreground">
+                              <Badge variant="outline" className="mr-1.5 text-xs">{item.type}</Badge>
+                              Modified by {item.editor} &bull; {item.lastModified}
+                            </div>
+                          </div>
                         </div>
-                    ) : recentItems.length > 0 ? (
-                        <div className="space-y-2">
-                            {recentItems.map((item) => {
-                              const ItemIcon = item.icon;
-                              return (
-                                <div key={item.id} className="flex items-center justify-between py-3 border-b last:border-b-0">
-                                    <div className="flex items-center gap-3">
-                                    <ItemIcon className="h-5 w-5 text-muted-foreground" />
-                                    <div>
-                                        <Link href={item.url} className="font-medium text-sm hover:underline">{item.title}</Link>
-                                        <div className="text-xs text-muted-foreground">
-                                          <Badge variant="outline" className="mr-1.5 text-xs">{item.type}</Badge>
-                                          Modified by {item.editor} &bull; {item.lastModified}
-                                        </div>
-                                    </div>
-                                    </div>
-                                    <Button variant="ghost" size="sm" asChild className="text-xs shrink-0">
-                                    <Link href={item.type === 'Page' ? `/pages?edit=${item.id}` : `/content-blocks?edit=${item.id}`}><Edit2 className="mr-1 h-3 w-3" /> Edit</Link>
-                                    </Button>
-                                </div>
-                              );
-                            })}
-                        </div>
-                    ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4">No recently modified items.</p>
-                    )}
-                </CardContent>
-            </Card>
+                        <Button variant="ghost" size="sm" asChild className="text-xs shrink-0">
+                          <Link href={item.type === 'Page' ? `/pages?edit=${item.id}` : `/content-blocks?edit=${item.id}`}><Edit2 className="mr-1 h-3 w-3" /> Edit</Link>
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No recently modified items.</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
-
-      <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" /> Google Analytics Dashboard Access
-            </CardTitle>
-            <CardDescription>
-              Direct link to your Google Analytics dashboard.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-3 border border-amber-500 bg-amber-50 text-amber-700 rounded-md text-sm flex items-start">
-              <Info className="h-5 w-5 mr-2 mt-0.5 shrink-0"/>
-              <div>
-                Click the button below to open your Google Analytics dashboard in a new tab.
-                If you encounter issues accessing it (e.g., login screen, errors), it might be because:
-                <ul className="list-disc pl-5 mt-1">
-                  <li>You are not logged into the correct Google account in your browser.</li>
-                  <li>The Google account you are using does not have permission to view this GA Property.</li>
-                </ul>
-                 Ensure you have the necessary permissions and are logged into the appropriate Google account. Contact your administrator if you believe you should have access. The target Property ID for this link is `491858320`.
-              </div>
-            </div>
-            <Button asChild>
-              <a href={gaDashboardUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center">
-                Open Google Analytics <ExternalLink className="ml-2 h-4 w-4" />
-              </a>
-            </Button>
-          </CardContent>
-      </Card>
 
       <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
         <CardHeader className="flex flex-row items-center justify-between">
@@ -365,6 +331,36 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground text-center py-4">No recent audit log activity.</p>
             )}
         </CardContent>
+      </Card>
+
+      <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" /> Google Analytics Dashboard Access
+            </CardTitle>
+            <CardDescription>
+              Direct link to your Google Analytics dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-3 border border-amber-500 bg-amber-50 text-amber-700 rounded-md text-sm flex items-start">
+              <Info className="h-5 w-5 mr-2 mt-0.5 shrink-0"/>
+              <div>
+                Click the button below to open your Google Analytics dashboard in a new tab.
+                If you encounter issues accessing it (e.g., login screen, errors), it might be because:
+                <ul className="list-disc pl-5 mt-1">
+                  <li>You are not logged into the correct Google account in your browser.</li>
+                  <li>The Google account you are using does not have permission to view this GA Property.</li>
+                </ul>
+                 Ensure you have the necessary permissions and are logged into the appropriate Google account. Contact your administrator if you believe you should have access. The target Property ID for this link is `491858320`.
+              </div>
+            </div>
+            <Button asChild>
+              <a href={gaDashboardUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center">
+                Open Google Analytics <ExternalLink className="ml-2 h-4 w-4" />
+              </a>
+            </Button>
+          </CardContent>
       </Card>
     </div>
   );
