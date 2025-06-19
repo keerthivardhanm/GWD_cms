@@ -6,15 +6,14 @@ import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
-// IMPORTANT: For production, you should store these keys in environment variables.
 const firebaseConfig = {
-  apiKey: "AIzaSyDYbsVI-4Zb0QTonR2iN-4GcLCBSrvisl8",
-  authDomain: "ahs-cms-7f4f6.firebaseapp.com",
-  projectId: "ahs-cms-7f4f6",
-  storageBucket: "ahs-cms-7f4f6.firebasestorage.app",
-  messagingSenderId: "132715335065",
-  appId: "1:132715335065:web:77e7bf22320dc0d8675708",
-  measurementId: "G-Z3E9BM7DCN"
+  apiKey: "AIzaSyA6s8RkorDxYy96M-UcU1dm60rLCm0xaTU",
+  authDomain: "gmc-cms-v2.firebaseapp.com",
+  projectId: "gmc-cms-v2",
+  storageBucket: "gmc-cms-v2.firebasestorage.app", // Corrected this, was firebasestorage.app
+  messagingSenderId: "854866143960",
+  appId: "1:854866143960:web:1583c1d23439dd2284c5ad",
+  measurementId: "G-49ZJ13X62D"
 };
 
 // Initialize Firebase

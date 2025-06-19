@@ -4,9 +4,9 @@ import {
   LayoutDashboard,
   FileText,
   Boxes,
-  Database,
+  Database, // Icon for Schema Builder
   Grid,
-  ShieldCheck, // Changed from Bug
+  ShieldCheck,
   History,
   Settings,
   ClipboardList,
@@ -27,17 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/pages', label: 'Pages', icon: FileText },
   { href: '/content-files', label: 'Content Files', icon: Boxes },
   { href: '/content-blocks', label: 'Content Blocks', icon: Grid },
-  // { href: '/media-manager', label: 'Media Manager', icon: ImageIcon }, // Removed Media Manager
-  // {
-  //   groupLabel: 'Development',
-  //   href: '#', // Placeholder, not a direct link
-  //   label: 'Development Tools', // Not displayed directly, for grouping logic
-  //   icon: Database, // Generic icon for group
-  //   subItems: [
-  //     { href: '/schema-builder', label: 'Schema Builder', icon: Database },
-  //     { href: '/form-builder', label: 'Form Builder', icon: ClipboardList },
-  //   ],
-  // },
+  { href: '/schema-builder', label: 'Schema Builder', icon: Database }, // Added Schema Builder
   {
     groupLabel: 'Administration',
     href: '#',
@@ -51,4 +41,5 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-export const APP_NAME = "Apollo CMS"; // Reverted from "Apollo Allied Health Academy"
+export const APP_NAME = "Apollo CMS";
+
