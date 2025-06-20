@@ -20,6 +20,7 @@ import type { Page as PageData, PageStatus } from '@/app/(app)/pages/page';
 import type { ContentBlock } from '@/app/(app)/content-blocks/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { useAuth } from '@/context/AuthContext';
 
 interface DashboardMetrics {
   totalPages: number;
@@ -50,6 +51,7 @@ interface ContentTypeOverviewData {
 
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentItems, setRecentItems] = useState<RecentActivityItem[]>([]);
   const [recentAuditLogs, setRecentAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -72,6 +74,14 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function fetchDashboardData() {
+      if (!user) { // Explicitly check for user before fetching
+        setLoadingMetrics(false);
+        setLoadingRecentContent(false);
+        setLoadingRecentAuditLogs(false);
+        setLoadingChartData(false);
+        return;
+      }
+
       setLoadingMetrics(true);
       setLoadingRecentContent(true);
       setLoadingRecentAuditLogs(true);
@@ -183,6 +193,7 @@ export default function DashboardPage() {
         
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
+        // Set specific error states if needed for UI feedback
       } finally {
         setLoadingMetrics(false);
         setLoadingRecentContent(false);
@@ -190,8 +201,16 @@ export default function DashboardPage() {
         setLoadingChartData(false);
       }
     }
-    fetchDashboardData();
-  }, []);
+
+    if (user) { // Only fetch if user is available
+        fetchDashboardData();
+    } else { // Set loading states to false if no user to prevent indefinite loading
+        setLoadingMetrics(false);
+        setLoadingRecentContent(false);
+        setLoadingRecentAuditLogs(false);
+        setLoadingChartData(false);
+    }
+  }, [user]);
 
 
   return (
