@@ -51,7 +51,7 @@ interface ContentTypeOverviewData {
 
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentItems, setRecentItems] = useState<RecentActivityItem[]>([]);
   const [recentAuditLogs, setRecentAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -74,7 +74,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function fetchDashboardData() {
-      if (!user) { // Explicitly check for user before fetching
+      if (!user) {
         setLoadingMetrics(false);
         setLoadingRecentContent(false);
         setLoadingRecentAuditLogs(false);
@@ -84,7 +84,6 @@ export default function DashboardPage() {
 
       setLoadingMetrics(true);
       setLoadingRecentContent(true);
-      setLoadingRecentAuditLogs(true);
       setLoadingChartData(true);
 
       try {
@@ -174,22 +173,28 @@ export default function DashboardPage() {
             return dateB.getTime() - dateA.getTime();
         });
         setRecentItems(fetchedRecentItems.slice(0, 5));
-        
-        const auditLogsQuery = query(collection(db, "auditLogs"), orderBy("timestamp", "desc"), limit(5));
-        const auditLogsSnapshot = await getDocs(auditLogsQuery);
-        const fetchedAuditLogs = auditLogsSnapshot.docs.map(doc => {
-            const data = doc.data();
-            const ts = data.timestamp instanceof Timestamp ? data.timestamp.toDate() : new Date();
-            return {
-                id: doc.id,
-                userName: data.userName || data.userId || 'System',
-                action: data.action || 'Unknown Action',
-                entityType: data.entityType,
-                entityName: data.entityName || data.entityId,
-                timestamp: ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString(),
-            };
-        });
-        setRecentAuditLogs(fetchedAuditLogs);
+
+        // Conditionally fetch Audit Logs only for Admins
+        if (userData?.role === 'Admin') {
+            setLoadingRecentAuditLogs(true);
+            const auditLogsQuery = query(collection(db, "auditLogs"), orderBy("timestamp", "desc"), limit(5));
+            const auditLogsSnapshot = await getDocs(auditLogsQuery);
+            const fetchedAuditLogs = auditLogsSnapshot.docs.map(doc => {
+                const data = doc.data();
+                const ts = data.timestamp instanceof Timestamp ? data.timestamp.toDate() : new Date();
+                return {
+                    id: doc.id,
+                    userName: data.userName || data.userId || 'System',
+                    action: data.action || 'Unknown Action',
+                    entityType: data.entityType,
+                    entityName: data.entityName || data.entityId,
+                    timestamp: ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString(),
+                };
+            });
+            setRecentAuditLogs(fetchedAuditLogs);
+        } else {
+            setRecentAuditLogs([]);
+        }
         
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -202,15 +207,15 @@ export default function DashboardPage() {
       }
     }
 
-    if (user) { // Only fetch if user is available
+    if (user) {
         fetchDashboardData();
-    } else { // Set loading states to false if no user to prevent indefinite loading
+    } else {
         setLoadingMetrics(false);
         setLoadingRecentContent(false);
         setLoadingRecentAuditLogs(false);
         setLoadingChartData(false);
     }
-  }, [user]);
+  }, [user, userData]); // Add userData to dependency array
 
 
   return (
@@ -259,10 +264,10 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <div> {/* Column 1 for Tasks */}
+        <div> 
           <KeepNotes />
         </div>
-        <div> {/* Column 2 for Recent Content */}
+        <div>
           <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -307,50 +312,52 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-        <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-                <CardTitle className="flex items-center gap-2">
-                    <ListChecks className="h-5 w-5" />
-                    Recent Audit Log Activity
-                </CardTitle>
-                <CardDescription>A quick glance at the latest system activities.</CardDescription>
-            </div>
-            <Button asChild variant="outline" size="sm">
-                <Link href="/audit-logs">
-                    <ShieldAlert className="mr-2 h-4 w-4"/> View All Audit Logs
-                </Link>
-            </Button>
-        </CardHeader>
-        <CardContent>
-            {loadingRecentAuditLogs ? (
-                <div className="flex justify-center items-center h-40">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-            ) : recentAuditLogs.length > 0 ? (
-                <ScrollArea className="h-[250px]">
-                <div className="space-y-4">
-                    {recentAuditLogs.map((log) => (
-                    <div key={log.id} className="flex items-start gap-3">
-                        <Avatar className="h-9 w-9 mt-1">
-                            <AvatarImage src={`https://placehold.co/40x40.png?text=${log.userName.substring(0,1)}`} alt={log.userName} data-ai-hint="user avatar"/>
-                            <AvatarFallback>{log.userName.substring(0,2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                        <div className="text-sm font-medium leading-none">
-                            <span className="font-semibold">{log.userName}</span> {log.action.toLowerCase().replace(/_/g, ' ')} {log.entityType && <Badge variant="secondary" className="ml-1 text-xs align-middle">{log.entityType}</Badge>} <span className="text-muted-foreground">{log.entityName && log.entityName !== log.id ? `"${log.entityName}"` : ''}</span>.
-                        </div>
-                        <p className="text-xs text-muted-foreground">{log.timestamp}</p>
-                        </div>
-                    </div>
-                    ))}
-                </div>
-                </ScrollArea>
-            ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">No recent audit log activity.</p>
-            )}
-        </CardContent>
-      </Card>
+      {userData?.role === 'Admin' && (
+        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                  <CardTitle className="flex items-center gap-2">
+                      <ListChecks className="h-5 w-5" />
+                      Recent Audit Log Activity
+                  </CardTitle>
+                  <CardDescription>A quick glance at the latest system activities.</CardDescription>
+              </div>
+              <Button asChild variant="outline" size="sm">
+                  <Link href="/audit-logs">
+                      <ShieldAlert className="mr-2 h-4 w-4"/> View All Audit Logs
+                  </Link>
+              </Button>
+          </CardHeader>
+          <CardContent>
+              {loadingRecentAuditLogs ? (
+                  <div className="flex justify-center items-center h-40">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+              ) : recentAuditLogs.length > 0 ? (
+                  <ScrollArea className="h-[250px]">
+                  <div className="space-y-4">
+                      {recentAuditLogs.map((log) => (
+                      <div key={log.id} className="flex items-start gap-3">
+                          <Avatar className="h-9 w-9 mt-1">
+                              <AvatarImage src={`https://placehold.co/40x40.png?text=${log.userName.substring(0,1)}`} alt={log.userName} data-ai-hint="user avatar"/>
+                              <AvatarFallback>{log.userName.substring(0,2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                          <div className="text-sm font-medium leading-none">
+                              <span className="font-semibold">{log.userName}</span> {log.action.toLowerCase().replace(/_/g, ' ')} {log.entityType && <Badge variant="secondary" className="ml-1 text-xs align-middle">{log.entityType}</Badge>} <span className="text-muted-foreground">{log.entityName && log.entityName !== log.id ? `"${log.entityName}"` : ''}</span>.
+                          </div>
+                          <p className="text-xs text-muted-foreground">{log.timestamp}</p>
+                          </div>
+                      </div>
+                      ))}
+                  </div>
+                  </ScrollArea>
+              ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">No recent audit log activity.</p>
+              )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
