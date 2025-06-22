@@ -3,8 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
   FileText,
-  Boxes,
-  Database, // Icon for Schema Builder
+  Database,
   Grid,
   ShieldCheck,
   History,
@@ -25,9 +24,8 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/pages', label: 'Pages', icon: FileText },
-  { href: '/content-files', label: 'Content Files', icon: Boxes },
   { href: '/content-blocks', label: 'Content Blocks', icon: Grid },
-  { href: '/schema-builder', label: 'Schema Builder', icon: Database }, // Added Schema Builder
+  { href: '/schema-builder', label: 'Schema Builder', icon: Database },
   {
     groupLabel: 'Administration',
     href: '#',
@@ -42,4 +40,3 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export const APP_NAME = "Apollo CMS";
-

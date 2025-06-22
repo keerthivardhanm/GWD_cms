@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
-import { PlusCircle, ExternalLink, LibraryBig, Settings, Search, Sparkles, type LucideIcon, Loader2 } from "lucide-react";
+import { PlusCircle, ExternalLink, Settings, Search, Sparkles, type LucideIcon, Loader2, FileText as PageIcon } from "lucide-react";
 import React, { useEffect, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -21,7 +21,7 @@ interface QuickActionItemProps {
 
 const QuickActionItem: React.FC<QuickActionItemProps> = ({ href, icon: IconComponent, label, isExternal, isLoading }) => {
   return (
-    <Button variant="outline" size="sm" className="h-auto px-3 py-2 flex flex-col items-center justify-center text-center w-[100px] shrink-0" asChild={!isLoading && !!href} disabled={isLoading || !href}>
+    <Button variant="outline" size="sm" className="h-auto px-3 py-2 flex flex-col items-center justify-center text-center w-[100px] shrink-0" asChild={!isLoading && !!href} disabled={isLoading || !href || href === "#"}>
       {isLoading ? (
          <div className="flex flex-col items-center justify-center">
             <Loader2 className="h-5 w-5 mb-1 animate-spin text-primary" />
@@ -50,13 +50,14 @@ export function QuickActions() {
         const docSnap = await getDoc(settingsDocRef);
         if (docSnap.exists()) {
           const settingsData = docSnap.data();
-          setLiveSiteUrl(settingsData?.siteUrl || "https://example.com"); // Fallback URL
+          // Use a fallback '#' URL if siteUrl is empty or not set
+          setLiveSiteUrl(settingsData?.siteUrl || "#"); 
         } else {
-          setLiveSiteUrl("https://example.com"); // Fallback if settings doc doesn't exist
+          setLiveSiteUrl("#"); // Fallback if settings doc doesn't exist
         }
       } catch (error) {
         console.error("Error fetching site URL for Quick Actions:", error);
-        setLiveSiteUrl("https://example.com"); // Fallback on error
+        setLiveSiteUrl("#"); // Fallback on error
       } finally {
         setLoadingSiteUrl(false);
       }
@@ -65,9 +66,8 @@ export function QuickActions() {
   }, []);
   
   const quickActionsList = [
-    { href: "/pages", icon: PlusCircle, label: "Create Section" },
+    { href: "/pages", icon: PageIcon, label: "Create Page" },
     { href: liveSiteUrl, icon: ExternalLink, label: "View Live Site", isExternal: true, isLoading: loadingSiteUrl },
-    { href: "/media-manager", icon: LibraryBig, label: "Media Library" },
     { href: "/settings", icon: Settings, label: "CMS Settings" },
     { href: "/dashboard", icon: Search, label: "Search Content" }, 
     { href: "/dashboard", icon: Sparkles, label: "AI Assistant" }, 
@@ -79,7 +79,7 @@ export function QuickActions() {
         {quickActionsList.map((action) => (
           <QuickActionItem 
             key={action.label} 
-            href={action.href || "#"} // Provide a fallback href if null
+            href={action.href || "#"}
             icon={action.icon}
             label={action.label}
             isExternal={action.isExternal}

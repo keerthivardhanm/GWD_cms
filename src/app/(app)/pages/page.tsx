@@ -222,6 +222,39 @@ export default function PagesManagementPage() {
     window.open(`/preview/${previewSlug}`, '_blank');
   };
 
+  const handleDuplicatePage = async (pageToDuplicate: Page) => {
+    try {
+      const docRef = doc(db, 'pages', pageToDuplicate.id);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        toast({ title: "Error", description: "Original page not found.", variant: "destructive" });
+        return;
+      }
+      
+      const originalData = docSnap.data();
+      const newPageData = {
+          ...originalData,
+          title: `${originalData.title} (Copy)`,
+          slug: `${originalData.slug}-copy-${Date.now()}`, // Ensure unique slug
+          status: 'Draft' as PageStatus,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          author: userData?.name || user?.email || 'System',
+      };
+
+      const newDocRef = await addDoc(collection(db, "pages"), newPageData);
+      await logAuditEvent(user, userData, 'PAGE_DUPLICATED', 'Page', newDocRef.id, newPageData.title, { originalPageId: pageToDuplicate.id });
+      
+      toast({ title: "Page Duplicated", description: `"${pageToDuplicate.title}" was successfully duplicated.` });
+      fetchPages(); // Refresh the list
+
+    } catch (err) {
+       console.error("Error duplicating page:", err);
+       toast({ title: "Error", description: `Failed to duplicate page. ${err instanceof Error ? err.message : ''}`, variant: "destructive" });
+    }
+  };
+
 
   const handleFormSubmit = async (values: PageFormValues, pageType: PageType, contentData?: any) => {
     try {
@@ -389,7 +422,7 @@ export default function PagesManagementPage() {
                             <DropdownMenuItem onClick={() => handleEditPage(page)}>
                               <Edit2 className="mr-2 h-4 w-4" /> Edit Page
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => alert('Duplicate not implemented yet.')}>
+                            <DropdownMenuItem onClick={() => handleDuplicatePage(page)}>
                               <Copy className="mr-2 h-4 w-4" /> Duplicate Page
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />

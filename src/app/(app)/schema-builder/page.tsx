@@ -7,10 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PlusCircle, List, Edit, Trash2, AlertTriangle, Loader2, Database as DatabaseIcon } from "lucide-react";
 import React, { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 
 // Placeholder types - actual implementation would be more complex
@@ -34,7 +35,7 @@ interface ContentSchema {
   updatedAt?: any; 
 }
 
-const exampleSchemas: ContentSchema[] = [
+const initialExampleSchemas: ContentSchema[] = [
     {
         id: "1",
         name: "Blog Post",
@@ -68,9 +69,9 @@ export default function SchemaBuilderPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Simulate fetching schemas
+    // Simulate fetching schemas from a source
     setTimeout(() => {
-      setSchemas(exampleSchemas);
+      setSchemas(initialExampleSchemas);
       setLoading(false);
     }, 500);
   }, []);
@@ -81,7 +82,7 @@ export default function SchemaBuilderPage() {
   };
 
   const handleEditSchema = (schema: ContentSchema) => {
-    const dataExistsForThisSchema = false; // This would be a real check
+    const dataExistsForThisSchema = false; // This would be a real check against Firestore
     
     if (dataExistsForThisSchema) {
         toast({
@@ -95,8 +96,14 @@ export default function SchemaBuilderPage() {
     setEditingSchema(schema);
     setIsFormOpen(true);
   };
+  
+  const handleSaveSchema = () => {
+      // In a real implementation, this would save to Firestore
+      toast({title: "Save (Not Implemented)", description: "Saving schema functionality is pending. This is a UI demonstration."});
+      setIsFormOpen(false);
+  }
 
-  const handleDeleteSchema = async (schema: ContentSchema) => {
+  const handleDeleteSchema = (schema: ContentSchema) => {
     const dataExistsForThisSchema = false; // Real check needed
     if (dataExistsForThisSchema) {
         toast({
@@ -107,7 +114,7 @@ export default function SchemaBuilderPage() {
         });
         return;
     }
-    toast({ title: "Feature Pending", description: `Deletion for "${schema.name}" not yet implemented.`});
+    toast({ title: "Delete (Not Implemented)", description: `Deletion for "${schema.name}" not yet implemented.`});
   };
 
 
@@ -181,9 +188,27 @@ export default function SchemaBuilderPage() {
                     <Button variant="outline" size="sm" onClick={() => handleEditSchema(schema)}>
                       <Edit className="mr-1.5 h-3.5 w-3.5" /> Edit
                     </Button>
-                    <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30 hover:border-destructive/50" onClick={() => handleDeleteSchema(schema)}>
-                      <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
-                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30 hover:border-destructive/50">
+                                <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure you want to delete "{schema.name}"?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action cannot be undone. Deleting a schema with existing content can lead to data loss. This is a UI demonstration.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeleteSchema(schema)}>
+                                    Delete
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </Card>
               ))}
@@ -252,7 +277,7 @@ export default function SchemaBuilderPage() {
 
           <DialogFooter className="mt-2">
             <Button variant="outline" onClick={() => setIsFormOpen(false)}>Cancel</Button>
-            <Button onClick={() => { setIsFormOpen(false); toast({title: "Save (Not Implemented)", description: "Saving schema functionality is pending."})}}>
+            <Button onClick={handleSaveSchema}>
                 {editingSchema ? "Save Changes" : "Create Schema"}
             </Button>
           </DialogFooter>
