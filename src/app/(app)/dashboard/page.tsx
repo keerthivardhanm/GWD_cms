@@ -6,10 +6,10 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { KeyMetricCard } from "@/components/dashboard/KeyMetricsCard";
 import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart"; // For bar chart
 import { PageStatusPieChart } from "@/components/dashboard/PageStatusPieChart"; // New pie chart component
-import { KeepNotes } from "@/components/dashboard/KeepNotes";
+import { SharedTasks } from "@/components/dashboard/SharedTasks";
 import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed"; 
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { FileText, Grid, BarChart3, Users, ExternalLink, Edit2, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity, UserPlus, Info, PieChart as PieChartIcon } from "lucide-react";
+import { FileText, Grid, BarChart3, Users, ExternalLink, Edit2, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity, UserPlus, Info, PieChart as PieChartIcon, Database } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,7 @@ import { useAuth } from '@/context/AuthContext';
 
 interface DashboardMetrics {
   totalPages: number;
-  totalContentBlocks: number;
+  totalSchemas: number;
   totalUsers: number;
 }
 
@@ -87,11 +87,11 @@ export default function DashboardPage() {
 
       try {
         const pagesCol = collection(db, "pages");
-        const blocksCol = collection(db, "contentBlocks");
+        const schemasCol = collection(db, "contentSchemas");
 
-        const [pagesSnapshot, blocksSnapshot, allPagesDocs] = await Promise.all([
+        const [pagesSnapshot, schemasSnapshot, allPagesDocs] = await Promise.all([
           getCountFromServer(pagesCol),
-          getCountFromServer(blocksCol),
+          getCountFromServer(schemasCol),
           getDocs(pagesCol),
         ]);
         
@@ -104,7 +104,7 @@ export default function DashboardPage() {
 
         const fetchedMetrics = {
           totalPages: pagesSnapshot.data().count,
-          totalContentBlocks: blocksSnapshot.data().count,
+          totalSchemas: schemasSnapshot.data().count,
           totalUsers: userCount,
         };
         setMetrics(fetchedMetrics);
@@ -127,7 +127,7 @@ export default function DashboardPage() {
 
         const baseContentTypeData = [
           { type: 'Pages', count: fetchedMetrics.totalPages },
-          { type: 'Blocks', count: fetchedMetrics.totalContentBlocks },
+          { type: 'Schemas', count: fetchedMetrics.totalSchemas },
         ];
         if (userData?.role === 'Admin') {
           setContentTypeData([...baseContentTypeData, { type: 'Users', count: fetchedMetrics.totalUsers }]);
@@ -135,12 +135,10 @@ export default function DashboardPage() {
           setContentTypeData(baseContentTypeData);
         }
 
-        const recentPagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc"), limit(3));
-        const recentBlocksQuery = query(collection(db, "contentBlocks"), orderBy("updatedAt", "desc"), limit(2));
-
-        const [recentPagesSnap, recentBlocksSnap] = await Promise.all([
+        const recentPagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc"), limit(5));
+        
+        const [recentPagesSnap] = await Promise.all([
           getDocs(recentPagesQuery),
-          getDocs(recentBlocksQuery),
         ]);
 
         const fetchedRecentItems: RecentActivityItem[] = [];
@@ -157,26 +155,8 @@ export default function DashboardPage() {
             icon: FileText,
           });
         });
-
-        recentBlocksSnap.forEach(doc => {
-          const block = doc.data() as ContentBlock;
-           fetchedRecentItems.push({
-            id: doc.id,
-            title: block.name,
-            type: "Block",
-            lastModified: block.updatedAt instanceof Timestamp ? block.updatedAt.toDate().toLocaleDateString() : 'N/A',
-            editor: 'N/A', 
-            url: `/content-blocks`,
-            icon: Grid,
-          });
-        });
         
-        fetchedRecentItems.sort((a, b) => {
-            const dateA = new Date(a.lastModified === 'N/A' ? 0 : a.lastModified);
-            const dateB = new Date(b.lastModified === 'N/A' ? 0 : b.lastModified);
-            return dateB.getTime() - dateA.getTime();
-        });
-        setRecentItems(fetchedRecentItems.slice(0, 5));
+        setRecentItems(fetchedRecentItems);
 
         if (userData?.role === 'Admin') {
             setLoadingRecentAuditLogs(true);
@@ -230,13 +210,13 @@ export default function DashboardPage() {
         {loadingMetrics || !metrics ? (
             <>
                 <KeyMetricCard title="Total Pages" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={FileText} />
-                <KeyMetricCard title="Content Blocks" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Grid} />
+                <KeyMetricCard title="Total Schemas" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Database} />
                 {userData?.role === 'Admin' && <KeyMetricCard title="Total Users" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Users} />}
             </>
         ) : (
             <>
                 <KeyMetricCard title="Total Pages" value={metrics.totalPages} icon={FileText} description="Published & drafts" />
-                <KeyMetricCard title="Content Blocks" value={metrics.totalContentBlocks} icon={Grid} description="Reusable content units" />
+                <KeyMetricCard title="Total Schemas" value={metrics.totalSchemas} icon={Database} description="Reusable content structures" />
                 {userData?.role === 'Admin' && (
                   <KeyMetricCard title="Total Users" value={metrics.totalUsers} icon={Users} description="Registered accounts" />
                 )}
@@ -266,14 +246,14 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <KeepNotes />
+        <SharedTasks />
         <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 h-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileClock className="h-5 w-5" />
-              Recently Modified Content
+              Recently Modified Pages
             </CardTitle>
-            <CardDescription>Quick access to recently updated items in the CMS.</CardDescription>
+            <CardDescription>Quick access to recently updated pages in the CMS.</CardDescription>
           </CardHeader>
           <CardContent>
             {loadingRecentContent ? (
@@ -297,7 +277,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <Button variant="ghost" size="sm" asChild className="text-xs shrink-0">
-                        <Link href={item.type === 'Page' ? `/pages?edit=${item.id}` : `/content-blocks?edit=${item.id}`}><Edit2 className="mr-1 h-3 w-3" /> Edit</Link>
+                        <Link href={`/pages?edit=${item.id}`}><Edit2 className="mr-1 h-3 w-3" /> Edit</Link>
                       </Button>
                     </div>
                   );

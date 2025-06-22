@@ -17,6 +17,30 @@ interface PageStatusPieChartProps {
   data: PageStatusDataPoint[];
 }
 
+const RADIAN = Math.PI / 180;
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value }) => {
+  if (value === 0 || percent < 0.05) { // Hide label for small or zero slices
+    return null;
+  }
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor={x > cx ? 'start' : 'end'}
+      dominantBaseline="central"
+      className="text-xs font-medium"
+    >
+      {`${name} (${value})`}
+    </text>
+  );
+};
+
+
 export function PageStatusPieChart({ data }: PageStatusPieChartProps) {
   const totalPages = data.reduce((sum, entry) => sum + entry.value, 0);
 
@@ -52,31 +76,20 @@ export function PageStatusPieChart({ data }: PageStatusPieChartProps) {
               cx="50%"
               cy="50%"
               labelLine={false}
-              outerRadius={100}
+              label={renderCustomizedLabel}
+              outerRadius={110}
               fill="#8884d8"
               dataKey="value"
               nameKey="name"
-              label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }) => {
-                const RADIAN = Math.PI / 180;
-                // Adjust label position slightly if needed, e.g., move further from center
-                const radius = innerRadius + (outerRadius - innerRadius) * 0.6; // Increased multiplier for positioning
-                const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                return (
-                  <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="12px" fontWeight="medium">
-                    {`${name} (${value})`}
-                  </text>
-                );
-              }}
             >
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.fill} />
+                <Cell key={`cell-${index}`} fill={entry.fill} stroke={entry.value > 0 ? "hsl(var(--background))" : "none"} strokeWidth={2} />
               ))}
             </Pie>
             <Tooltip 
               contentStyle={{ backgroundColor: "hsl(var(--background))", border: "1px solid hsl(var(--border))", borderRadius: "var(--radius)"}}
             />
-            <Legend />
+            <Legend wrapperStyle={{fontSize: "12px"}}/>
           </PieChart>
         </ResponsiveContainer>
       </CardContent>
