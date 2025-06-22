@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import { useForm, Controller, useFieldArray } from 'react-hook-form';
+import { useForm, Controller, useFieldArray, useFormContext } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -11,19 +11,30 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, Trash2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Checkbox } from '../ui/checkbox';
 
-// Define the structure of a single field within a schema
-export const fieldSchema = z.object({
+// Define the structure of a single field within a schema.
+// It's recursive using z.lazy() to allow for nested repeater fields.
+const fieldSchema: z.ZodType<SchemaField> = z.lazy(() => z.object({
   id: z.string().default(() => crypto.randomUUID()),
   name: z.string().min(1, 'Field name is required').regex(/^[a-zA-Z0-9_]+$/, 'Name must be alphanumeric with underscores'),
   label: z.string().min(1, 'Label is required'),
   type: z.enum(['text', 'textarea', 'number', 'boolean', 'date', 'image_url', 'rich_text', 'repeater']),
   required: z.boolean().default(false),
-});
-export type SchemaField = z.infer<typeof fieldSchema>;
+  fields: z.array(fieldSchema).optional(), // for repeater sub-fields
+}));
+
+// We need to explicitly type this for recursion to work well in TypeScript.
+export type SchemaField = {
+  id: string;
+  name: string;
+  label: string;
+  type: 'text' | 'textarea' | 'number' | 'boolean' | 'date' | 'image_url' | 'rich_text' | 'repeater';
+  required: boolean;
+  fields?: SchemaField[];
+};
 
 
 // Define the structure for the entire schema form
@@ -46,8 +57,68 @@ interface SchemaFormProps {
   onCancel: () => void;
 }
 
+// Sub-component for building the fields of a repeater
+const SubFieldBuilder = ({ nestIndex }: { nestIndex: number }) => {
+    const { control, register, formState: { errors }, watch } = useFormContext<ContentSchemaFormValues>();
+    const { fields, append, remove } = useFieldArray({
+        control,
+        name: `fields.${nestIndex}.fields`
+    });
+
+    return (
+        <div className="space-y-3">
+            {fields.map((item, k) => (
+                <Card key={item.id} className="p-3 bg-background relative shadow-sm">
+                     <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => remove(k)}
+                        className="absolute top-1 right-1 h-6 w-6 text-destructive hover:bg-destructive/10"
+                    >
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-6">
+                        <div>
+                            <Label htmlFor={`fields.${nestIndex}.fields.${k}.name`}>Sub-Field Name</Label>
+                            <Input {...register(`fields.${nestIndex}.fields.${k}.name`)} placeholder="e.g., item_title" />
+                        </div>
+                        <div>
+                            <Label htmlFor={`fields.${nestIndex}.fields.${k}.label`}>Sub-Field Label</Label>
+                            <Input {...register(`fields.${nestIndex}.fields.${k}.label`)} placeholder="e.g., Item Title" />
+                        </div>
+                        <div>
+                            <Label htmlFor={`fields.${nestIndex}.fields.${k}.type`}>Sub-Field Type</Label>
+                             <Controller
+                                name={`fields.${nestIndex}.fields.${k}.type`}
+                                control={control}
+                                render={({ field }) => (
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <SelectTrigger><SelectValue/></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="text">Text</SelectItem>
+                                            <SelectItem value="textarea">Textarea</SelectItem>
+                                            <SelectItem value="number">Number</SelectItem>
+                                            <SelectItem value="boolean">Boolean</SelectItem>
+                                            <SelectItem value="image_url">Image URL</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            />
+                        </div>
+                    </div>
+                </Card>
+            ))}
+            <Button type="button" variant="outline" size="sm" onClick={() => append({ id: crypto.randomUUID(), name: '', label: '', type: 'text', required: false, fields: [] })}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Sub-Field
+            </Button>
+        </div>
+    );
+};
+
+
 export function SchemaForm({ onSubmit, initialData, onCancel }: SchemaFormProps) {
-  const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<ContentSchemaFormValues>({
+  const { register, handleSubmit, control, formState: { errors, isSubmitting }, watch } = useForm<ContentSchemaFormValues>({
     resolver: zodResolver(contentSchemaFormSchema),
     defaultValues: initialData || {
       name: '',
@@ -72,8 +143,8 @@ export function SchemaForm({ onSubmit, initialData, onCancel }: SchemaFormProps)
                     {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
                 </div>
                 <div>
-                    <Label htmlFor="slug">Schema Slug (Collection Name)</Label>
-                    <Input id="slug" {...register("slug")} placeholder="e.g., blog-posts, products (lowercase, hyphens)" disabled={!!initialData} />
+                    <Label htmlFor="slug">Schema Slug (API Identifier)</Label>
+                    <Input id="slug" {...register("slug")} placeholder="e.g., blog-posts (lowercase, hyphens)" disabled={!!initialData} />
                     {errors.slug && <p className="text-sm text-destructive mt-1">{errors.slug.message}</p>}
                     {!!initialData && <p className="text-xs text-muted-foreground mt-1">Slug cannot be changed after creation.</p>}
                 </div>
@@ -87,7 +158,7 @@ export function SchemaForm({ onSubmit, initialData, onCancel }: SchemaFormProps)
                     <CardHeader>
                         <CardTitle className="text-base flex justify-between items-center">
                             Fields
-                            <Button type="button" variant="outline" size="sm" onClick={() => append({ id: crypto.randomUUID(), name: '', label: '', type: 'text', required: false })}>
+                            <Button type="button" variant="outline" size="sm" onClick={() => append({ id: crypto.randomUUID(), name: '', label: '', type: 'text', required: false, fields: [] })}>
                                 <PlusCircle className="mr-2 h-4 w-4"/>
                                 Add Field
                             </Button>
@@ -121,12 +192,12 @@ export function SchemaForm({ onSubmit, initialData, onCancel }: SchemaFormProps)
                                                     <SelectContent>
                                                         <SelectItem value="text">Text</SelectItem>
                                                         <SelectItem value="textarea">Textarea</SelectItem>
+                                                        <SelectItem value="rich_text">Rich Text</SelectItem>
                                                         <SelectItem value="number">Number</SelectItem>
                                                         <SelectItem value="boolean">Boolean (Checkbox)</SelectItem>
                                                         <SelectItem value="date">Date</SelectItem>
                                                         <SelectItem value="image_url">Image URL</SelectItem>
-                                                        <SelectItem value="rich_text">Rich Text</SelectItem>
-                                                        <SelectItem value="repeater">Repeater (List of Text)</SelectItem>
+                                                        <SelectItem value="repeater">Repeater (Section)</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             )}
@@ -152,6 +223,17 @@ export function SchemaForm({ onSubmit, initialData, onCancel }: SchemaFormProps)
                                         </Button>
                                     </div>
                                 </div>
+                                {watch(`fields.${index}.type`) === 'repeater' && (
+                                    <Card className="mt-4 bg-slate-50 dark:bg-slate-800/20">
+                                        <CardHeader>
+                                            <CardTitle className="text-sm">Repeater Sub-Fields</CardTitle>
+                                            <CardDescription className="text-xs">Define the fields for each item in this repeater section.</CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <SubFieldBuilder nestIndex={index} />
+                                        </CardContent>
+                                    </Card>
+                                )}
                             </Card>
                         ))}
                     </CardContent>

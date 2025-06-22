@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, Trash2, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import type { ContentSchema } from './SchemaForm';
 import { Checkbox } from '../ui/checkbox';
 
@@ -53,14 +53,76 @@ const generateSlug = (title: string) => {
     .replace(/--+/g, '-'); 
 };
 
+// Sub-component for rendering a repeater field (useFieldArray)
+const RepeaterField = ({ fieldSchema, parentPath }: { fieldSchema: ContentSchema['fields'][number], parentPath: string }) => {
+    const { control, formState: { errors } } = useFormContext<PageFormValues>();
+    const fieldName = `${parentPath}.${fieldSchema.name}` as const;
+    const { fields, append, remove } = useFieldArray({
+        control,
+        name: fieldName as any, // Using 'any' due to deep nesting complexity with RHF types
+    });
+
+    const handleAddItem = () => {
+        const defaultItem: Record<string, any> = {};
+        if (fieldSchema.fields) {
+            fieldSchema.fields.forEach(subField => {
+                if (subField.type === 'boolean') defaultItem[subField.name] = false;
+                else if (subField.type === 'number') defaultItem[subField.name] = 0;
+                else if (subField.type === 'repeater') defaultItem[subField.name] = [];
+                else defaultItem[subField.name] = '';
+            });
+        }
+        append(defaultItem);
+    };
+
+    return (
+        <Card className="my-4 border-dashed bg-muted/20">
+            <CardHeader>
+                <CardTitle className="text-md">{fieldSchema.label}</CardTitle>
+                <CardDescription>Add, remove, or reorder items.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+                {fields.map((item, index) => (
+                    <Card key={item.id} className="p-4 bg-background relative shadow-sm">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => remove(index)}
+                            className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 z-10"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Remove Item {index + 1}</span>
+                        </Button>
+                        <div className="space-y-4 pr-8">
+                             <h4 className="font-semibold text-sm text-muted-foreground">Item {index + 1}</h4>
+                            {fieldSchema.fields?.map(subField => (
+                                <DynamicField
+                                    key={`${item.id}-${subField.id}`}
+                                    fieldSchema={subField}
+                                    parentPath={`${fieldName}.${index}`}
+                                />
+                            ))}
+                        </div>
+                    </Card>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={handleAddItem}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add "{fieldSchema.label}" Item
+                </Button>
+            </CardContent>
+        </Card>
+    );
+};
+
+
 // Sub-component for rendering a single field from a schema
 const DynamicField = ({ fieldSchema, parentPath }: { fieldSchema: ContentSchema['fields'][number], parentPath: string }) => {
     const { control, register, formState: { errors } } = useFormContext<PageFormValues>();
     const fieldName = `${parentPath}.${fieldSchema.name}` as const;
     
     // Helper to get nested errors
-    const getNestedError = (errors: any, path: string): any => {
-        return path.split('.').reduce((o, k) => (o && o[k] ? o[k] : null), errors);
+    const getNestedError = (errorsObj: any, path: string): any => {
+        return path.split('.').reduce((o, k) => (o && o[k] ? o[k] : null), errorsObj);
     };
     const error = getNestedError(errors, fieldName);
 
@@ -73,7 +135,7 @@ const DynamicField = ({ fieldSchema, parentPath }: { fieldSchema: ContentSchema[
             return (
                 <div>
                     <Label htmlFor={fieldName}>{fieldSchema.label}</Label>
-                    <Input id={fieldName} type={fieldSchema.type === 'image_url' ? 'text' : fieldSchema.type} {...register(fieldName)} placeholder={fieldSchema.label} />
+                    <Input id={fieldName} type={fieldSchema.type === 'image_url' ? 'text' : fieldSchema.type} {...register(fieldName as any)} placeholder={fieldSchema.label} />
                     {error && <p className="text-sm text-destructive mt-1">{error.message}</p>}
                 </div>
             );
@@ -82,7 +144,7 @@ const DynamicField = ({ fieldSchema, parentPath }: { fieldSchema: ContentSchema[
             return (
                  <div>
                     <Label htmlFor={fieldName}>{fieldSchema.label}</Label>
-                    <Textarea id={fieldName} {...register(fieldName)} placeholder={fieldSchema.label} rows={fieldSchema.type === 'rich_text' ? 8 : 4} />
+                    <Textarea id={fieldName} {...register(fieldName as any)} placeholder={fieldSchema.label} rows={fieldSchema.type === 'rich_text' ? 8 : 4} />
                     {error && <p className="text-sm text-destructive mt-1">{error.message}</p>}
                 </div>
             );
@@ -90,7 +152,7 @@ const DynamicField = ({ fieldSchema, parentPath }: { fieldSchema: ContentSchema[
             return (
                  <div className="flex items-center space-x-2 pt-4">
                     <Controller
-                        name={fieldName}
+                        name={fieldName as any}
                         control={control}
                         render={({ field }) => (
                             <Checkbox id={fieldName} checked={field.value} onCheckedChange={field.onChange} />
@@ -106,50 +168,6 @@ const DynamicField = ({ fieldSchema, parentPath }: { fieldSchema: ContentSchema[
         default:
             return <p>Unsupported field type: {fieldSchema.type}</p>;
     }
-}
-
-// Sub-component for rendering a repeater field (useFieldArray)
-const RepeaterField = ({ fieldSchema, parentPath }: { fieldSchema: ContentSchema['fields'][number], parentPath: string }) => {
-    const { control, formState: { errors } } = useFormContext<PageFormValues>();
-    const fieldName = `${parentPath}.${fieldSchema.name}` as const;
-    const { fields, append, remove } = useFieldArray({
-        control,
-        name: fieldName
-    });
-    
-    // Helper to get nested errors
-    const getNestedError = (errors: any, path: string): any => {
-        return path.split('.').reduce((o, k) => (o && o[k] ? o[k] : null), errors);
-    };
-
-    return (
-        <Card className="my-4 border-dashed">
-            <CardHeader>
-                <CardTitle className="text-md">{fieldSchema.label}</CardTitle>
-                <CardDescription>Add, remove, or reorder items.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-                {fields.map((item, index) => {
-                     const itemError = getNestedError(errors, `${fieldName}[${index}]`);
-                     return (
-                        <Card key={item.id} className="p-3 bg-muted/50 relative">
-                             <div className="space-y-2">
-                                <Label>Item {index + 1}</Label>
-                                <Textarea {...control.register(`${fieldName}.${index}.value` as const)} placeholder={`Enter value for item ${index + 1}`} />
-                                {itemError && <p className="text-sm text-destructive mt-1">{itemError.value?.message}</p>}
-                            </div>
-                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="absolute top-1 right-1 h-6 w-6 text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </Card>
-                    )
-                })}
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ value: '' })}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Item
-                </Button>
-            </CardContent>
-        </Card>
-    )
 }
 
 
@@ -213,13 +231,25 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
         clearErrors("slug");
         return;
       }
+
       try {
-        const q = query(collection(db, "pages"), where("slug", "==", slugToCheck), where("__name__", "!=", initialData?.id || ""));
+        const pagesRef = collection(db, "pages");
+        const slugQueryConstraint = where("slug", "==", slugToCheck);
+        let q;
+
+        if (initialData?.id) {
+          // EDITING an existing document, so exclude it from the uniqueness check.
+          q = query(pagesRef, slugQueryConstraint, where("__name__", "!=", initialData.id));
+        } else {
+          // CREATING a new document, no need to exclude any ID.
+          q = query(pagesRef, slugQueryConstraint);
+        }
+
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
-            setError("slug", { type: "manual", message: "This slug is already in use." });
+          setError("slug", { type: "manual", message: "This slug is already in use." });
         } else {
-           clearErrors("slug"); 
+          clearErrors("slug");
         }
       } catch (error) {
         console.error("Error checking slug uniqueness:", error);
