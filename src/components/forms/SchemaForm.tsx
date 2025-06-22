@@ -20,7 +20,7 @@ export const fieldSchema = z.object({
   id: z.string().default(() => crypto.randomUUID()),
   name: z.string().min(1, 'Field name is required').regex(/^[a-zA-Z0-9_]+$/, 'Name must be alphanumeric with underscores'),
   label: z.string().min(1, 'Label is required'),
-  type: z.enum(['text', 'textarea', 'number', 'boolean', 'date', 'image_url', 'rich_text']),
+  type: z.enum(['text', 'textarea', 'number', 'boolean', 'date', 'image_url', 'rich_text', 'repeater']),
   required: z.boolean().default(false),
 });
 export type SchemaField = z.infer<typeof fieldSchema>;
@@ -126,6 +126,7 @@ export function SchemaForm({ onSubmit, initialData, onCancel }: SchemaFormProps)
                                                         <SelectItem value="date">Date</SelectItem>
                                                         <SelectItem value="image_url">Image URL</SelectItem>
                                                         <SelectItem value="rich_text">Rich Text</SelectItem>
+                                                        <SelectItem value="repeater">Repeater (List of Text)</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             )}

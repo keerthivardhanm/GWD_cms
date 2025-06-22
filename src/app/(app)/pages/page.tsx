@@ -16,21 +16,12 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, QueryDocumentSnapshot, DocumentData, Timestamp, serverTimestamp, query, orderBy, getDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { PageForm, PageFormValues, PageStatus, PageType } from '@/components/forms/PageForm';
-import type { HomePageContentType } from '@/schemas/pages/homePageSchema';
-import type { AboutUsPageContentType } from '@/schemas/pages/aboutUsPageSchema';
-import type { AdmissionsPageContentType } from '@/schemas/pages/admissionsPageSchema';
-import type { ContactPageContentType } from '@/schemas/pages/contactPageSchema';
-import type { ProgramsListingPageContentType } from '@/schemas/pages/programsListingPageSchema';
-import type { IndividualProgramPageContentType } from '@/schemas/pages/individualProgramPageSchema';
-import type { CentresOverviewPageContentType } from '@/schemas/pages/centresOverviewPageSchema';
-import type { IndividualCentrePageContentType } from '@/schemas/pages/individualCentrePageSchema';
-import type { EnquiryPageContentType } from '@/schemas/pages/enquiryPageSchema';
-
 import { useAuth } from '@/context/AuthContext';
 import { logAuditEvent } from '@/lib/auditLogger';
 
-// Define base page structure
-interface BasePage {
+// A generic Page interface that can hold any content structure.
+// The actual structure of 'content' is determined by the schema in Firestore.
+export interface Page {
   id: string;
   title: string;
   slug: string;
@@ -39,74 +30,9 @@ interface BasePage {
   author: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
-  pageType: PageType;
+  pageType: PageType; // This will now be the slug of a schema from contentSchemas
+  content?: Record<string, any>; // Flexible content structure
 }
-
-// Define specific page types with their content
-export interface GenericPageData {
-  mainContent?: string;
-  [key: string]: any;
-}
-export interface GenericPage extends BasePage {
-  pageType: 'generic';
-  content?: GenericPageData;
-}
-
-export interface HomePage extends BasePage {
-  pageType: 'home';
-  content: HomePageContentType;
-}
-
-export interface AboutUsPage extends BasePage {
-  pageType: 'about-us';
-  content: AboutUsPageContentType;
-}
-
-export interface AdmissionsPage extends BasePage {
-  pageType: 'admissions';
-  content: AdmissionsPageContentType;
-}
-
-export interface ContactPage extends BasePage {
-  pageType: 'contact';
-  content: ContactPageContentType;
-}
-
-export interface ProgramsListingPage extends BasePage {
-  pageType: 'programs';
-  content: ProgramsListingPageContentType;
-}
-
-export interface IndividualProgramPage extends BasePage {
-  pageType: 'program-detail';
-  content: IndividualProgramPageContentType;
-}
-export interface CentresOverviewPage extends BasePage {
-  pageType: 'centres';
-  content: CentresOverviewPageContentType;
-}
-export interface IndividualCentrePage extends BasePage {
-  pageType: 'centre-detail';
-  content: IndividualCentrePageContentType;
-}
-export interface EnquiryPage extends BasePage {
-  pageType: 'enquiry';
-  content: EnquiryPageContentType;
-}
-
-
-// Union type for all possible page structures
-export type Page =
-  | GenericPage
-  | HomePage
-  | AboutUsPage
-  | AdmissionsPage
-  | ContactPage
-  | ProgramsListingPage
-  | IndividualProgramPage
-  | CentresOverviewPage
-  | IndividualCentrePage
-  | EnquiryPage;
 
 
 export default function PagesManagementPage() {
@@ -130,11 +56,11 @@ export default function PagesManagementPage() {
       const querySnapshot = await getDocs(pagesQuery);
       const pagesData = querySnapshot.docs.map((docSnap: QueryDocumentSnapshot<DocumentData>) => {
         const data = docSnap.data();
-        let lastModifiedStr = data.updatedAt instanceof Timestamp
+        const lastModifiedStr = data.updatedAt instanceof Timestamp
                               ? data.updatedAt.toDate().toLocaleDateString()
                               : (data.createdAt instanceof Timestamp ? data.createdAt.toDate().toLocaleDateString() : new Date().toLocaleDateString());
 
-        const baseData = {
+        return {
           id: docSnap.id,
           title: data.title || '',
           slug: data.slug || '',
@@ -143,32 +69,9 @@ export default function PagesManagementPage() {
           author: data.author || 'Unknown',
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
-          pageType: data.pageType || 'generic',
+          pageType: data.pageType || 'uncategorized',
           content: data.content || {},
-        };
-
-        switch (baseData.pageType) {
-          case 'home':
-            return { ...baseData, content: data.content || {} } as HomePage;
-          case 'about-us':
-            return { ...baseData, content: data.content || {} } as AboutUsPage;
-          case 'admissions':
-            return { ...baseData, content: data.content || {} } as AdmissionsPage;
-          case 'contact':
-            return { ...baseData, content: data.content || {} } as ContactPage;
-          case 'programs':
-            return { ...baseData, content: data.content || {} } as ProgramsListingPage;
-          case 'program-detail':
-            return { ...baseData, content: data.content || {} } as IndividualProgramPage;
-          case 'centres':
-            return { ...baseData, content: data.content || {} } as CentresOverviewPage;
-          case 'centre-detail':
-            return { ...baseData, content: data.content || {} } as IndividualCentrePage;
-          case 'enquiry':
-            return { ...baseData, content: data.content || {} } as EnquiryPage;
-          default: 
-            return { ...baseData, content: data.content || { mainContent: ''} } as GenericPage;
-        }
+        } as Page;
       });
       setAllPages(pagesData);
       setFilteredPages(pagesData); 
@@ -256,11 +159,10 @@ export default function PagesManagementPage() {
   };
 
 
-  const handleFormSubmit = async (values: PageFormValues, pageType: PageType, contentData?: any) => {
+  const handleFormSubmit = async (values: PageFormValues) => {
     try {
       const dataToSave: any = {
         ...values, 
-        content: contentData || {},
         updatedAt: serverTimestamp(),
         author: values.author || userData?.name || user?.email || 'Admin',
       };
@@ -274,7 +176,7 @@ export default function PagesManagementPage() {
         }
 
         await updateDoc(pageRef, dataToSave);
-        await logAuditEvent(user, userData, 'PAGE_UPDATED', 'Page', editingPage.id, values.title, { newValues: values, newContentSummary: Object.keys(contentData || {}).join(', ') });
+        await logAuditEvent(user, userData, 'PAGE_UPDATED', 'Page', editingPage.id, values.title, { newValues: { ...values, content: '...' } });
         toast({
           title: "Success",
           description: "Page updated successfully.",
@@ -282,7 +184,7 @@ export default function PagesManagementPage() {
       } else {
         dataToSave.createdAt = serverTimestamp();
         const newDocRef = await addDoc(collection(db, "pages"), dataToSave);
-        await logAuditEvent(user, userData, 'PAGE_CREATED', 'Page', newDocRef.id, values.title, { values, contentSummary: Object.keys(contentData || {}).join(', ') });
+        await logAuditEvent(user, userData, 'PAGE_CREATED', 'Page', newDocRef.id, values.title, { values: { ...values, content: '...'} });
         toast({
           title: "Success",
           description: "Page created successfully.",
@@ -394,7 +296,7 @@ export default function PagesManagementPage() {
                     <TableCell className="font-medium">{page.title}</TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">{page.slug}</TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground capitalize">
-                        {page.pageType.replace('-', ' ')}
+                        {page.pageType.replace(/-/g, ' ')}
                     </TableCell>
                     <TableCell>
                       <Badge variant={page.status === "Published" ? "default" : page.status === "Draft" ? "secondary" : "outline"}
