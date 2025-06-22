@@ -185,7 +185,18 @@ export default function AccessControlPage() {
         await sendPasswordResetEmail(auth, values.email);
         
         await logAuditEvent(authUser, authUserData, 'USER_CREATED', 'User', newAuthUser.uid, values.name, { name: values.name, email: values.email, role: values.role });
-        toast({ title: "User Created", description: `User ${values.email} created successfully. A password reset email has been sent to them.` });
+        
+        toast({ 
+          title: "User Account Created", 
+          description: (
+              <div>
+                  <p>User {values.email} has been created.</p>
+                  <p className="mt-2 font-semibold">An email to set their password has been sent.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">If they don't receive it, please ask them to check their spam folder, or use the "Forgot Password" link on the login page.</p>
+              </div>
+          ),
+          duration: 10000,
+        });
         
       } else if (editingUser) { 
         const userRef = doc(db, "users", editingUser.id);
@@ -568,4 +579,5 @@ export default function AccessControlPage() {
   );
 }
 
+    
     
