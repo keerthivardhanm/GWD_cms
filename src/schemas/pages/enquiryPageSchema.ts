@@ -21,5 +21,3 @@ export const EnquiryPageContentSchema = z.object({
 }).default({});
 
 export type EnquiryPageContentType = z.infer<typeof EnquiryPageContentSchema>;
-
-    

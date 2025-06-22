@@ -763,12 +763,8 @@ export function PageForm({ onSubmit, initialData, onCancel }: PageFormProps) {
                     {centresListFields.map((centreField, centreIndex) => (
                         <CentreItemForm 
                             key={centreField.id} 
-                            control={control}
-                            register={register}
-                            errors={errors}
-                            centreIndex={centreIndex} 
-                            removeCentre={() => removeCentresListItem(centreIndex)}
-                        />
+                            removeCentre={() => removeCentresListItem(centreIndex)} 
+                            centreIndex={centreIndex}                        />
                     ))}
                     <Button type="button" variant="outline" size="sm" onClick={() => appendCentresListItem(CentresOverviewPageContentSchema.shape.centresList.element.parse({}))}>
                       <PlusCircle className="mr-1 h-3 w-3"/> Add New Centre Item

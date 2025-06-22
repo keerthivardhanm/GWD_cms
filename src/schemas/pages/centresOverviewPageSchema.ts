@@ -34,5 +34,3 @@ export const CentresOverviewPageContentSchema = z.object({
 }).default({});
 
 export type CentresOverviewPageContentType = z.infer<typeof CentresOverviewPageContentSchema>;
-
-    
