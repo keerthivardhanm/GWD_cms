@@ -9,7 +9,7 @@ import { PageStatusPieChart } from "@/components/dashboard/PageStatusPieChart"; 
 import { KeepNotes } from "@/components/dashboard/KeepNotes";
 import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed"; 
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { FileText, Files, Grid, BarChart3, Users, ExternalLink, Edit2, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity, UserPlus, Info, PieChart as PieChartIcon } from "lucide-react";
+import { FileText, Grid, BarChart3, Users, ExternalLink, Edit2, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity, UserPlus, Info, PieChart as PieChartIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,6 @@ import { useAuth } from '@/context/AuthContext';
 
 interface DashboardMetrics {
   totalPages: number;
-  totalFiles: number; // Assuming mediaItems for files
   totalContentBlocks: number;
   totalUsers: number;
 }
@@ -88,13 +87,11 @@ export default function DashboardPage() {
 
       try {
         const pagesCol = collection(db, "pages");
-        const filesCol = collection(db, "mediaItems"); 
         const blocksCol = collection(db, "contentBlocks");
         const usersCol = collection(db, "users");
 
-        const [pagesSnapshot, filesSnapshot, blocksSnapshot, usersSnapshot, allPagesDocs] = await Promise.all([
+        const [pagesSnapshot, blocksSnapshot, usersSnapshot, allPagesDocs] = await Promise.all([
           getCountFromServer(pagesCol),
-          getCountFromServer(filesCol),
           getCountFromServer(blocksCol),
           getCountFromServer(usersCol),
           getDocs(pagesCol), 
@@ -102,7 +99,6 @@ export default function DashboardPage() {
         
         const fetchedMetrics = {
           totalPages: pagesSnapshot.data().count,
-          totalFiles: filesSnapshot.data().count,
           totalContentBlocks: blocksSnapshot.data().count,
           totalUsers: usersSnapshot.data().count,
         };
@@ -128,7 +124,6 @@ export default function DashboardPage() {
           { type: 'Pages', count: fetchedMetrics.totalPages },
           { type: 'Blocks', count: fetchedMetrics.totalContentBlocks },
           { type: 'Users', count: fetchedMetrics.totalUsers },
-          { type: 'Media', count: fetchedMetrics.totalFiles },
         ]);
 
         const recentPagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc"), limit(3));
@@ -224,18 +219,16 @@ export default function DashboardPage() {
 
       <QuickActions /> 
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {loadingMetrics || !metrics ? (
             <>
                 <KeyMetricCard title="Total Pages" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={FileText} />
-                <KeyMetricCard title="Total Media Files" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Files} />
                 <KeyMetricCard title="Content Blocks" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Grid} />
                 <KeyMetricCard title="Total Users" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Users} />
             </>
         ) : (
             <>
                 <KeyMetricCard title="Total Pages" value={metrics.totalPages} icon={FileText} description="Published & drafts" />
-                <KeyMetricCard title="Total Media Files" value={metrics.totalFiles} icon={Files} description="In media library" />
                 <KeyMetricCard title="Content Blocks" value={metrics.totalContentBlocks} icon={Grid} description="Reusable content units" />
                 <KeyMetricCard title="Total Users" value={metrics.totalUsers} icon={Users} description="Registered accounts" />
             </>
@@ -263,53 +256,49 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <div> 
-          <KeepNotes />
-        </div>
-        <div>
-          <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileClock className="h-5 w-5" />
-                Recently Modified Content
-              </CardTitle>
-              <CardDescription>Quick access to recently updated items in the CMS.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingRecentContent ? (
-                <div className="flex justify-center items-center h-20">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : recentItems.length > 0 ? (
-                <div className="space-y-2">
-                  {recentItems.map((item) => {
-                    const ItemIcon = item.icon;
-                    return (
-                      <div key={item.id} className="flex items-center justify-between py-3 border-b last:border-b-0">
-                        <div className="flex items-center gap-3">
-                          <ItemIcon className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <Link href={item.url} className="font-medium text-sm hover:underline">{item.title}</Link>
-                            <div className="text-xs text-muted-foreground">
-                              <Badge variant="outline" className="mr-1.5 text-xs">{item.type}</Badge>
-                              Modified by {item.editor} &bull; {item.lastModified}
-                            </div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <KeepNotes />
+        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 h-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileClock className="h-5 w-5" />
+              Recently Modified Content
+            </CardTitle>
+            <CardDescription>Quick access to recently updated items in the CMS.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingRecentContent ? (
+              <div className="flex justify-center items-center h-20">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : recentItems.length > 0 ? (
+              <div className="space-y-2">
+                {recentItems.map((item) => {
+                  const ItemIcon = item.icon;
+                  return (
+                    <div key={item.id} className="flex items-center justify-between py-3 border-b last:border-b-0">
+                      <div className="flex items-center gap-3">
+                        <ItemIcon className="h-5 w-5 text-muted-foreground" />
+                        <div>
+                          <Link href={item.url} className="font-medium text-sm hover:underline">{item.title}</Link>
+                          <div className="text-xs text-muted-foreground">
+                            <Badge variant="outline" className="mr-1.5 text-xs">{item.type}</Badge>
+                            Modified by {item.editor} &bull; {item.lastModified}
                           </div>
                         </div>
-                        <Button variant="ghost" size="sm" asChild className="text-xs shrink-0">
-                          <Link href={item.type === 'Page' ? `/pages?edit=${item.id}` : `/content-blocks?edit=${item.id}`}><Edit2 className="mr-1 h-3 w-3" /> Edit</Link>
-                        </Button>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">No recently modified items.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                      <Button variant="ghost" size="sm" asChild className="text-xs shrink-0">
+                        <Link href={item.type === 'Page' ? `/pages?edit=${item.id}` : `/content-blocks?edit=${item.id}`}><Edit2 className="mr-1 h-3 w-3" /> Edit</Link>
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No recently modified items.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {userData?.role === 'Admin' && (
