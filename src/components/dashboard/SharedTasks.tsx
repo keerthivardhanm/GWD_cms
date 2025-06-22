@@ -4,16 +4,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from '@/components/ui/input';
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ListChecks, Trash2, PlusCircle, Loader2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { ListChecks, Loader2 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
 import { logAuditEvent } from '@/lib/auditLogger';
 
 interface Task {
@@ -28,7 +26,6 @@ interface Task {
 
 export function SharedTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [newTaskText, setNewTaskText] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { user, userData } = useAuth();
@@ -49,31 +46,10 @@ export function SharedTasks() {
   }, [toast]);
 
   useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
-
-  const handleAddTask = async (e?: React.FormEvent<HTMLFormElement>) => {
-    if (e) e.preventDefault();
-    if (!newTaskText.trim() || !user || !userData) return;
-
-    const taskData = {
-      text: newTaskText.trim(),
-      completed: false,
-      createdAt: serverTimestamp(),
-      createdBy: { userId: user.uid, userName: userData.name },
-    };
-
-    try {
-      const newDocRef = await addDoc(collection(db, "sharedTasks"), taskData);
-      await logAuditEvent(user, userData, 'TASK_CREATED', 'SharedTask', newDocRef.id, taskData.text);
-      setNewTaskText("");
-      toast({ title: "Task Added", description: `"${taskData.text.substring(0,20)}..." added.`});
-      fetchTasks(); // Refresh list
-    } catch (error) {
-      console.error("Error adding task:", error);
-      toast({ title: "Error", description: "Failed to add task.", variant: "destructive" });
+    if (user) {
+        fetchTasks();
     }
-  };
+  }, [fetchTasks, user]);
 
   const handleToggleTask = async (taskId: string, currentStatus: boolean, taskText: string) => {
     if (!user || !userData) return;
@@ -97,26 +73,10 @@ export function SharedTasks() {
       toast({ title: "Error", description: "Failed to update task status.", variant: "destructive" });
     }
   };
-
-  const handleDeleteTask = async (taskId: string, taskText: string) => {
-    if (!user || !userData || userData.role !== 'Admin') return;
-
-    try {
-      await deleteDoc(doc(db, "sharedTasks", taskId));
-      await logAuditEvent(user, userData, 'TASK_DELETED', 'SharedTask', taskId, taskText);
-      toast({ title: "Task Deleted", description: `Task "${taskText.substring(0,20)}..." removed.` });
-      fetchTasks();
-    } catch (error) {
-      console.error("Error deleting task:", error);
-      toast({ title: "Error", description: "Failed to delete task.", variant: "destructive" });
-    }
-  };
   
   const sortedTasks = React.useMemo(() => {
     return [...tasks].sort((a, b) => {
       if (a.completed === b.completed) {
-        // Uncompleted tasks are sorted by newest first
-        // Completed tasks are sorted by newest completion first
         if (a.completed && a.completedAt && b.completedAt) {
             return b.completedAt.toMillis() - a.completedAt.toMillis();
         }
@@ -126,8 +86,6 @@ export function SharedTasks() {
     });
   }, [tasks]);
 
-  const isAdmin = userData?.role === 'Admin';
-
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 lg:col-span-1">
       <CardHeader>
@@ -136,29 +94,10 @@ export function SharedTasks() {
           Shared Tasks
         </CardTitle>
         <CardDescription>
-          {isAdmin ? "Assign tasks to all users. They will be notified." : "Tasks assigned by your administrator."}
+          A list of tasks for the team. Check them off as you go.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isAdmin && (
-            <form onSubmit={handleAddTask} className="space-y-3 mb-6">
-                <div>
-                    <Label htmlFor="newTaskText" className="sr-only">New Task</Label>
-                    <div className="flex gap-2">
-                    <Input
-                        id="newTaskText"
-                        placeholder="Add a new shared task..."
-                        value={newTaskText}
-                        onChange={(e) => setNewTaskText(e.target.value)}
-                    />
-                    <Button type="submit" size="icon" aria-label="Add Task">
-                        <PlusCircle className="h-5 w-5" />
-                    </Button>
-                    </div>
-                </div>
-            </form>
-        )}
-
         <div className="mt-2 pt-2 border-t">
           {isLoading && (
             <div className="flex justify-center items-center py-4">
@@ -168,7 +107,7 @@ export function SharedTasks() {
           )}
           {!isLoading && tasks.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-4">
-                {isAdmin ? "No tasks yet. Add one above!" : "No tasks assigned right now."}
+                No tasks assigned right now. Great job!
             </p>
           )}
           {!isLoading && tasks.length > 0 && (
@@ -198,30 +137,6 @@ export function SharedTasks() {
                         )}
                     </div>
                   </div>
-                  {isAdmin && (
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0">
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete task {task.text}</span>
-                        </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Task: "{task.text.substring(0,30)}{task.text.length > 30 ? '...' : ''}"?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                            This action cannot be undone. The task will be permanently deleted for all users.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteTask(task.id, task.text)} className="bg-destructive hover:bg-destructive/90">
-                            Delete
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                  )}
                 </div>
               ))}
             </ScrollArea>
