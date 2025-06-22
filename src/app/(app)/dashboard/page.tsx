@@ -7,6 +7,7 @@ import { KeyMetricCard } from "@/components/dashboard/KeyMetricsCard";
 import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart"; // For bar chart
 import { PageStatusPieChart } from "@/components/dashboard/PageStatusPieChart"; // New pie chart component
 import { SharedTasks } from "@/components/dashboard/SharedTasks";
+import { KeepNotes } from "@/components/dashboard/KeepNotes";
 import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed"; 
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { FileText, Grid, BarChart3, Users, ExternalLink, Edit2, Settings, FileClock, Loader2, ListChecks, ShieldAlert, Activity, UserPlus, Info, PieChart as PieChartIcon, Database } from "lucide-react";
@@ -247,7 +248,8 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <SharedTasks />
-        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 h-full">
+        <KeepNotes />
+        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 h-full md:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileClock className="h-5 w-5" />
@@ -369,3 +371,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

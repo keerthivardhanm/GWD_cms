@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ImageIcon, Shield, Palette, Save, RotateCcw, AlertTriangle, Loader2, Users, Globe } from "lucide-react"; // Updated icons
+import { ImageIcon, Shield, Save, RotateCcw, AlertTriangle, Loader2, Users, Globe } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
@@ -39,11 +39,6 @@ const settingsSchema = z.object({
   passwordLength: z.number().min(6).optional().default(8),
   maxLoginAttempts: z.number().min(1).optional().default(5),
   sessionTimeout: z.number().min(5).optional().default(30), // in minutes
-
-  // Theme & Appearance
-  themeMode: z.enum(['Light', 'Dark', 'Auto']).optional().default('Auto'),
-  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color").or(z.literal('')).optional().default('#FF7F50'), 
-  fontFamily: z.string().optional().default('Inter'),
 });
 
 type SettingsFormValues = z.infer<typeof settingsSchema>;
@@ -173,7 +168,6 @@ export default function SettingsPage() {
             <TabsTrigger value="siteSettings"><Globe className="mr-2 h-4 w-4" />Site Settings</TabsTrigger>
             <TabsTrigger value="userRoles"><Users className="mr-2 h-4 w-4" />User & Roles</TabsTrigger>
             <TabsTrigger value="securitySettings"><Shield className="mr-2 h-4 w-4" />Security</TabsTrigger>
-            <TabsTrigger value="themeSettings"><Palette className="mr-2 h-4 w-4" />Theme & Appearance</TabsTrigger>
           </TabsList>
 
           {/* 1. Site Settings */}
@@ -238,36 +232,6 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
-
-          {/* 4. Theme & Appearance */}
-          <TabsContent value="themeSettings">
-            <Card>
-              <CardHeader><CardTitle>Theme & Appearance</CardTitle><CardDescription>Customize the look and feel.</CardDescription></CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="themeMode">CMS Theme Mode</Label>
-                  <Controller name="themeMode" control={control} render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Light">Light</SelectItem><SelectItem value="Dark">Dark</SelectItem><SelectItem value="Auto">Auto (System Preference)</SelectItem></SelectContent></Select>
-                  )}/>
-                </div>
-                <div>
-                  <Label htmlFor="primaryColor">Primary Accent Color (Hex)</Label>
-                  <div className="flex items-center gap-2">
-                    <Input id="primaryColor" type="text" {...register("primaryColor")} placeholder="#FF7F50" className="w-1/2"/>
-                    <Controller name="primaryColor" control={control} render={({field}) => <Input type="color" value={field.value} onChange={field.onChange} className="h-10 p-1 w-12"/> } />
-                  </div>
-                  {errors.primaryColor && <p className="text-sm text-destructive">{errors.primaryColor.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="fontFamily">Default CMS Font Family</Label>
-                   <Controller name="fontFamily" control={control} render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Inter">Inter</SelectItem><SelectItem value="Roboto">Roboto</SelectItem><SelectItem value="Poppins">Poppins</SelectItem><SelectItem value="Open Sans">Open Sans</SelectItem></SelectContent></Select>
-                  )}/>
-                </div>
-                <p className="text-xs text-muted-foreground">Note: Applying these theme changes live to the CMS admin UI requires additional JavaScript to update CSS variables or recompile styles. Public site theme is separate.</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
 
         <div className="mt-8 pt-6 border-t flex justify-end space-x-2">
@@ -282,3 +246,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
