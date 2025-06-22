@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,17 +13,13 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ImageIcon, Shield, Save, RotateCcw, AlertTriangle, Loader2, Users, Globe, ClipboardList, Trash2, PlusCircle } from "lucide-react";
+import { Shield, Save, RotateCcw, AlertTriangle, Loader2, Users, Globe } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, collection, query, orderBy, getDocs, addDoc, deleteDoc, Timestamp, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext';
 import { logAuditEvent } from '@/lib/auditLogger';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+
 
 // Define a Zod schema for all settings
 const settingsSchema = z.object({
@@ -47,223 +43,9 @@ const settingsSchema = z.object({
 });
 
 type SettingsFormValues = z.infer<typeof settingsSchema>;
-interface AppUser {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
-interface Task {
-    id: string;
-    text: string;
-    assignedTo: string[]; // Array of user IDs
-    assignedToNames?: { id: string, name: string }[];
-    completedBy: Record<string, Timestamp>; // Map of userId to completion timestamp
-    createdAt: Timestamp;
-    createdBy: { userId: string; userName: string };
-}
-const assignTaskFormSchema = z.object({
-    text: z.string().min(1, "Task description is required."),
-    assignedUsers: z.array(z.string()).min(1, "You must assign the task to at least one user."),
-});
-type AssignTaskFormValues = z.infer<typeof assignTaskFormSchema>;
-
 
 const SETTINGS_DOC_ID = "globalAppSettings";
 const SETTINGS_COLLECTION = "config"; 
-
-// Task Assignment Manager Component Logic, integrated into Settings page
-const TaskAssignmentManager = () => {
-    const [tasks, setTasks] = useState<Task[]>([]);
-    const [users, setUsers] = useState<AppUser[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isFormOpen, setIsFormOpen] = useState(false);
-    const { toast } = useToast();
-    const { user, userData } = useAuth();
-    
-    const { register, handleSubmit, control, reset, formState: { errors } } = useForm<AssignTaskFormValues>({
-        resolver: zodResolver(assignTaskFormSchema),
-        defaultValues: { text: '', assignedUsers: [] }
-    });
-
-    const fetchAllData = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            // Fetch users
-            const usersQuery = query(collection(db, "users"), orderBy("name"));
-            const usersSnapshot = await getDocs(usersQuery);
-            const fetchedUsers = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppUser));
-            setUsers(fetchedUsers);
-
-            // Fetch tasks
-            const tasksQuery = query(collection(db, "tasks"), orderBy("createdAt", "desc"));
-            const tasksSnapshot = await getDocs(tasksQuery);
-            const fetchedTasks: Task[] = tasksSnapshot.docs.map(doc => {
-                const data = doc.data() as Omit<Task, 'id'>;
-                const assignedToNames = fetchedUsers
-                    .filter(u => data.assignedTo.includes(u.id))
-                    .map(u => ({ id: u.id, name: u.name }));
-                return { id: doc.id, ...data, assignedToNames };
-            });
-            setTasks(fetchedTasks);
-
-        } catch (error) {
-            console.error("Error fetching tasks/users:", error);
-            toast({ title: "Error", description: "Could not fetch tasks or users.", variant: "destructive" });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [toast]);
-
-    useEffect(() => {
-        fetchAllData();
-    }, [fetchAllData]);
-    
-    const onAssignSubmit = async (data: AssignTaskFormValues) => {
-        if (!user || !userData) return;
-
-        const taskData = {
-          text: data.text.trim(),
-          assignedTo: data.assignedUsers,
-          completedBy: {},
-          createdAt: serverTimestamp(),
-          createdBy: { userId: user.uid, userName: userData.name },
-        };
-
-        try {
-          const newDocRef = await addDoc(collection(db, "tasks"), taskData);
-          await logAuditEvent(user, userData, 'TASK_ASSIGNED', 'Task', newDocRef.id, taskData.text.substring(0, 30), { assignedTo: data.assignedUsers.length + " user(s)" });
-          reset();
-          setIsFormOpen(false);
-          toast({ title: "Task Assigned", description: `Task has been assigned to ${data.assignedUsers.length} user(s).`});
-          fetchAllData();
-        } catch (error) {
-          console.error("Error assigning task:", error);
-          toast({ title: "Error", description: "Failed to assign task.", variant: "destructive" });
-        }
-    };
-    
-    const handleDeleteTask = async (taskId: string, taskText: string) => {
-        if (!user || !userData) return;
-        try {
-          await deleteDoc(doc(db, "tasks", taskId));
-          await logAuditEvent(user, userData, 'TASK_DELETED', 'Task', taskId, taskText);
-          toast({ title: "Task Deleted", description: `Task "${taskText.substring(0,20)}..." removed.` });
-          fetchAllData();
-        } catch (error) {
-          console.error("Error deleting task:", error);
-          toast({ title: "Error", description: "Failed to delete task.", variant: "destructive" });
-        }
-    };
-
-    return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>Manage User Tasks</CardTitle>
-                    <CardDescription>Create tasks and assign them to one or more users.</CardDescription>
-                </div>
-                <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                    <DialogTrigger asChild>
-                        <Button><PlusCircle className="mr-2 h-4 w-4" /> Create & Assign Task</Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Create a New Task</DialogTitle>
-                            <DialogDescription>Write the task and select which users to assign it to.</DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleSubmit(onAssignSubmit)} className="space-y-4">
-                             <div>
-                                <Label htmlFor="text">Task Description</Label>
-                                <Textarea id="text" {...register("text")} placeholder="e.g., Review the new marketing page."/>
-                                {errors.text && <p className="text-destructive text-sm mt-1">{errors.text.message}</p>}
-                            </div>
-                            <div>
-                                <Label>Assign To</Label>
-                                <ScrollArea className="h-40 rounded-md border p-2">
-                                    <Controller
-                                        name="assignedUsers"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <div className="space-y-1">
-                                                {users.map(u => (
-                                                    <div key={u.id} className="flex items-center gap-2">
-                                                        <Checkbox
-                                                            id={`user-${u.id}`}
-                                                            checked={field.value?.includes(u.id)}
-                                                            onCheckedChange={(checked) => {
-                                                                return checked
-                                                                    ? field.onChange([...(field.value || []), u.id])
-                                                                    : field.onChange((field.value || []).filter(id => id !== u.id));
-                                                            }}
-                                                        />
-                                                        <Label htmlFor={`user-${u.id}`} className="font-normal">{u.name}</Label>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    />
-                                </ScrollArea>
-                                {errors.assignedUsers && <p className="text-destructive text-sm mt-1">{errors.assignedUsers.message}</p>}
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)}>Cancel</Button>
-                                <Button type="submit">Assign Task</Button>
-                            </div>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-            </CardHeader>
-            <CardContent>
-                <div className="border rounded-md">
-                     {isLoading ? (
-                        <div className="flex items-center justify-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-                     ) : tasks.length === 0 ? (
-                        <p className="p-4 text-center text-muted-foreground">No tasks have been created yet.</p>
-                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Task</TableHead>
-                                    <TableHead>Assigned To</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {tasks.map(task => (
-                                    <TableRow key={task.id}>
-                                        <TableCell className="font-medium max-w-xs truncate">{task.text}</TableCell>
-                                        <TableCell className="text-muted-foreground text-xs">{(task.assignedToNames || []).map(u => u.name).join(', ')}</TableCell>
-                                        <TableCell className="text-muted-foreground text-xs">{Object.keys(task.completedBy).length} / {task.assignedTo.length} completed</TableCell>
-                                        <TableCell className="text-right">
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                        <AlertDialogDescription>This will permanently delete the task "{task.text}" for all users. This action cannot be undone.</AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteTask(task.id, task.text)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                     )}
-                </div>
-            </CardContent>
-        </Card>
-    );
-};
-
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -384,7 +166,6 @@ export default function SettingsPage() {
           <TabsList className="flex flex-wrap h-auto justify-start">
             <TabsTrigger value="siteSettings"><Globe className="mr-2 h-4 w-4" />Site Settings</TabsTrigger>
             <TabsTrigger value="userRoles"><Users className="mr-2 h-4 w-4" />User & Roles</TabsTrigger>
-            {userData?.role === 'Admin' && <TabsTrigger value="taskManagement"><ClipboardList className="mr-2 h-4 w-4" />Task Management</TabsTrigger>}
             <TabsTrigger value="securitySettings"><Shield className="mr-2 h-4 w-4" />Security</TabsTrigger>
           </TabsList>
 
@@ -435,13 +216,6 @@ export default function SettingsPage() {
                 </Card>
             </form>
           </TabsContent>
-
-          {/* 3. Shared Tasks Management */}
-          {userData?.role === 'Admin' && (
-              <TabsContent value="taskManagement">
-                  <TaskAssignmentManager />
-              </TabsContent>
-          )}
 
           {/* 4. Security Settings */}
           <TabsContent value="securitySettings">

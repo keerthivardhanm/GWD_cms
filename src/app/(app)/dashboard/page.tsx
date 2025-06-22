@@ -6,7 +6,6 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { KeyMetricCard } from "@/components/dashboard/KeyMetricsCard";
 import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart"; // For bar chart
 import { PageStatusPieChart } from "@/components/dashboard/PageStatusPieChart"; // New pie chart component
-import { SharedTasks } from "@/components/dashboard/SharedTasks";
 import { KeepNotes } from "@/components/dashboard/KeepNotes";
 import type { RecentActivityItem } from "@/components/dashboard/RecentActivityFeed"; 
 import { QuickActions } from "@/components/dashboard/QuickActions";
@@ -247,9 +246,8 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <SharedTasks />
         <KeepNotes />
-        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 h-full md:col-span-2">
+        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 h-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileClock className="h-5 w-5" />
