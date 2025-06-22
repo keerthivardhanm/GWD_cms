@@ -10,7 +10,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyA6s8RkorDxYy96M-UcU1dm60rLCm0xaTU",
   authDomain: "gmc-cms-v2.firebaseapp.com",
   projectId: "gmc-cms-v2",
-  storageBucket: "gmc-cms-v2.firebasestorage.app", // Corrected this, was firebasestorage.app
+  storageBucket: "gmc-cms-v2.firebasestorage.app",
   messagingSenderId: "854866143960",
   appId: "1:854866143960:web:1583c1d23439dd2284c5ad",
   measurementId: "G-49ZJ13X62D"
@@ -29,4 +29,3 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 
 export { app, db, auth, storage };
-

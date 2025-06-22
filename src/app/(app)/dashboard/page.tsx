@@ -50,7 +50,7 @@ interface ContentTypeOverviewData {
 
 
 export default function DashboardPage() {
-  const { user, userData } = useAuth();
+  const { user, userData, loading: authLoading } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentItems, setRecentItems] = useState<RecentActivityItem[]>([]);
   const [recentAuditLogs, setRecentAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -73,7 +73,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function fetchDashboardData() {
-      if (!user) {
+      if (!user || !userData) {
         setLoadingMetrics(false);
         setLoadingRecentContent(false);
         setLoadingRecentAuditLogs(false);
@@ -88,19 +88,24 @@ export default function DashboardPage() {
       try {
         const pagesCol = collection(db, "pages");
         const blocksCol = collection(db, "contentBlocks");
-        const usersCol = collection(db, "users");
 
-        const [pagesSnapshot, blocksSnapshot, usersSnapshot, allPagesDocs] = await Promise.all([
+        const [pagesSnapshot, blocksSnapshot, allPagesDocs] = await Promise.all([
           getCountFromServer(pagesCol),
           getCountFromServer(blocksCol),
-          getCountFromServer(usersCol),
-          getDocs(pagesCol), 
+          getDocs(pagesCol),
         ]);
         
+        let userCount = 0;
+        if (userData?.role === 'Admin') {
+          const usersCol = collection(db, "users");
+          const usersSnapshot = await getCountFromServer(usersCol);
+          userCount = usersSnapshot.data().count;
+        }
+
         const fetchedMetrics = {
           totalPages: pagesSnapshot.data().count,
           totalContentBlocks: blocksSnapshot.data().count,
-          totalUsers: usersSnapshot.data().count,
+          totalUsers: userCount,
         };
         setMetrics(fetchedMetrics);
         
@@ -120,11 +125,15 @@ export default function DashboardPage() {
         }));
         setPageStatusData(pieData);
 
-        setContentTypeData([
+        const baseContentTypeData = [
           { type: 'Pages', count: fetchedMetrics.totalPages },
           { type: 'Blocks', count: fetchedMetrics.totalContentBlocks },
-          { type: 'Users', count: fetchedMetrics.totalUsers },
-        ]);
+        ];
+        if (userData?.role === 'Admin') {
+          setContentTypeData([...baseContentTypeData, { type: 'Users', count: fetchedMetrics.totalUsers }]);
+        } else {
+          setContentTypeData(baseContentTypeData);
+        }
 
         const recentPagesQuery = query(collection(db, "pages"), orderBy("updatedAt", "desc"), limit(3));
         const recentBlocksQuery = query(collection(db, "contentBlocks"), orderBy("updatedAt", "desc"), limit(2));
@@ -169,7 +178,6 @@ export default function DashboardPage() {
         });
         setRecentItems(fetchedRecentItems.slice(0, 5));
 
-        // Conditionally fetch Audit Logs only for Admins
         if (userData?.role === 'Admin') {
             setLoadingRecentAuditLogs(true);
             const auditLogsQuery = query(collection(db, "auditLogs"), orderBy("timestamp", "desc"), limit(5));
@@ -193,7 +201,6 @@ export default function DashboardPage() {
         
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
-        // Set specific error states if needed for UI feedback
       } finally {
         setLoadingMetrics(false);
         setLoadingRecentContent(false);
@@ -202,15 +209,15 @@ export default function DashboardPage() {
       }
     }
 
-    if (user) {
+    if (user && userData) {
         fetchDashboardData();
-    } else {
+    } else if (!user && !authLoading) {
         setLoadingMetrics(false);
         setLoadingRecentContent(false);
         setLoadingRecentAuditLogs(false);
         setLoadingChartData(false);
     }
-  }, [user, userData]); // Add userData to dependency array
+  }, [user, userData, authLoading]);
 
 
   return (
@@ -224,13 +231,15 @@ export default function DashboardPage() {
             <>
                 <KeyMetricCard title="Total Pages" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={FileText} />
                 <KeyMetricCard title="Content Blocks" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Grid} />
-                <KeyMetricCard title="Total Users" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Users} />
+                {userData?.role === 'Admin' && <KeyMetricCard title="Total Users" value={<Loader2 className="h-5 w-5 animate-spin" />} icon={Users} />}
             </>
         ) : (
             <>
                 <KeyMetricCard title="Total Pages" value={metrics.totalPages} icon={FileText} description="Published & drafts" />
                 <KeyMetricCard title="Content Blocks" value={metrics.totalContentBlocks} icon={Grid} description="Reusable content units" />
-                <KeyMetricCard title="Total Users" value={metrics.totalUsers} icon={Users} description="Registered accounts" />
+                {userData?.role === 'Admin' && (
+                  <KeyMetricCard title="Total Users" value={metrics.totalUsers} icon={Users} description="Registered accounts" />
+                )}
             </>
         )}
       </div>
