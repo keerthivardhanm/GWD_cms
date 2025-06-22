@@ -7,63 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PlusCircle, List, Edit, Trash2, AlertTriangle, Loader2, Database as DatabaseIcon } from "lucide-react";
 import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useAuth } from "@/context/AuthContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-
-// Placeholder types - actual implementation would be more complex
-interface SchemaField {
-  id: string;
-  name: string;
-  label: string; 
-  type: 'text' | 'textarea' | 'number' | 'boolean' | 'date' | 'image_url' | 'select' | 'rich_text' | 'group'; 
-  options?: string[];
-  required?: boolean;
-  fields?: SchemaField[]; 
-}
-
-interface ContentSchema {
-  id: string; 
-  name: string; 
-  slug: string; 
-  description?: string;
-  fields: SchemaField[];
-  createdAt?: any; 
-  updatedAt?: any; 
-}
-
-const initialExampleSchemas: ContentSchema[] = [
-    {
-        id: "1",
-        name: "Blog Post",
-        slug: "blog-posts",
-        description: "Standard schema for creating blog articles.",
-        fields: [
-            { id: "f1", name: "title", label: "Title", type: "text", required: true },
-            { id: "f2", name: "featured_image", label: "Featured Image", type: "image_url", required: true },
-            { id: "f3", name: "content", label: "Content", type: "rich_text", required: true },
-            { id: "f4", name: "author", label: "Author", type: "text", required: false },
-        ]
-    },
-    {
-        id: "2",
-        name: "Service Page",
-        slug: "service-pages",
-        description: "Schema for individual company service offerings.",
-        fields: [
-            { id: "s1", name: "service_name", label: "Service Name", type: "text", required: true },
-            { id: "s2", name: "description", label: "Description", type: "textarea", required: true },
-            { id: "s3", name: "service_icon", label: "Service Icon URL", type: "image_url", required: false },
-        ]
-    }
-];
+import { SchemaForm, type ContentSchema, type ContentSchemaFormValues } from '@/components/forms/SchemaForm';
 
 export default function SchemaBuilderPage() {
   const [schemas, setSchemas] = useState<ContentSchema[]>([]);
@@ -71,9 +21,8 @@ export default function SchemaBuilderPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSchema, setEditingSchema] = useState<ContentSchema | null>(null);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   
-  // A map to hold whether content exists for a given schema slug
   const [contentExistsMap, setContentExistsMap] = useState<Record<string, boolean>>({});
 
   const checkContentExists = useCallback(async (schemaSlug: string) => {
@@ -84,32 +33,42 @@ export default function SchemaBuilderPage() {
       return !querySnapshot.empty;
     } catch (error) {
       console.error(`Error checking content for schema ${schemaSlug}:`, error);
-      return false; // Assume no content on error to be safe
+      return false;
     }
   }, []);
-  
-  useEffect(() => {
-    // Simulate fetching schemas from a source
-    const fetchSchemasAndCheckContent = async () => {
-        setLoading(true);
-        // In a real app, you would fetch from Firestore here.
-        // For this example, we use the static `initialExampleSchemas`.
-        setSchemas(initialExampleSchemas);
+
+  const fetchSchemas = useCallback(async () => {
+    setLoading(true);
+    try {
+        const schemasQuery = query(collection(db, "contentSchemas"), where("name", "!=", "")); // Basic query to get schemas
+        const querySnapshot = await getDocs(schemasQuery);
+        const fetchedSchemas = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as ContentSchema));
         
-        const checks = initialExampleSchemas.map(schema => checkContentExists(schema.slug));
+        setSchemas(fetchedSchemas);
+
+        const checks = fetchedSchemas.map(schema => checkContentExists(schema.slug));
         const results = await Promise.all(checks);
         
         const newContentExistsMap: Record<string, boolean> = {};
-        initialExampleSchemas.forEach((schema, index) => {
+        fetchedSchemas.forEach((schema, index) => {
             newContentExistsMap[schema.slug] = results[index];
         });
-        
         setContentExistsMap(newContentExistsMap);
+
+    } catch (error) {
+        console.error("Error fetching schemas:", error);
+        toast({ title: "Error", description: "Could not fetch content schemas.", variant: "destructive" });
+    } finally {
         setLoading(false);
     }
-    
-    fetchSchemasAndCheckContent();
-  }, [checkContentExists]);
+  }, [checkContentExists, toast]);
+  
+  useEffect(() => {
+    fetchSchemas();
+  }, [fetchSchemas]);
 
   const handleCreateNewSchema = () => {
     setEditingSchema(null);
@@ -121,16 +80,39 @@ export default function SchemaBuilderPage() {
     setIsFormOpen(true);
   };
   
-  const handleSaveSchema = () => {
-      // In a real implementation, this would save to Firestore
-      toast({title: "Save (Not Implemented)", description: "Saving schema functionality is pending. This is a UI demonstration."});
-      setIsFormOpen(false);
-  }
-
-  const handleDeleteSchema = (schema: ContentSchema) => {
-    toast({ title: "Delete (Not Implemented)", description: `Deletion for "${schema.name}" not yet implemented.`});
+  const handleSaveSchema = async (values: ContentSchemaFormValues) => {
+    if (!user) {
+        toast({ title: "Not Authenticated", description: "You must be logged in to save a schema.", variant: "destructive"});
+        return;
+    }
+    try {
+        if (editingSchema) {
+            const schemaRef = doc(db, "contentSchemas", editingSchema.id);
+            await updateDoc(schemaRef, { ...values, updatedAt: serverTimestamp() });
+            toast({ title: "Schema Updated", description: `"${values.name}" has been updated successfully.` });
+        } else {
+            await addDoc(collection(db, "contentSchemas"), { ...values, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+            toast({ title: "Schema Created", description: `"${values.name}" has been created successfully.` });
+        }
+        setIsFormOpen(false);
+        setEditingSchema(null);
+        fetchSchemas(); // Re-fetch to show changes
+    } catch (error) {
+        console.error("Error saving schema: ", error);
+        toast({ title: "Error", description: "Failed to save schema.", variant: "destructive" });
+    }
   };
 
+  const handleDeleteSchema = async (schemaId: string, schemaName: string) => {
+    try {
+        await deleteDoc(doc(db, "contentSchemas", schemaId));
+        toast({ title: "Schema Deleted", description: `"${schemaName}" has been deleted.` });
+        fetchSchemas(); // Re-fetch
+    } catch (error) {
+        console.error("Error deleting schema: ", error);
+        toast({ title: "Error", description: "Failed to delete schema.", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -240,14 +222,12 @@ export default function SchemaBuilderPage() {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure you want to delete "{schema.name}"?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                This action cannot be undone. Deleting a schema with existing content can lead to data loss. This is a UI demonstration.
-                                <br/><br/>
-                                <span className="font-bold text-destructive">Warning:</span> If you proceed, you might orphan the data associated with this schema.
+                                    This action cannot be undone and will permanently delete the "{schema.name}" schema definition.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeleteSchema(schema)}>
+                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeleteSchema(schema.id, schema.name)}>
                                 Delete
                                 </AlertDialogAction>
                             </AlertDialogFooter>
@@ -284,7 +264,10 @@ export default function SchemaBuilderPage() {
         </CardContent>
       </Card>
       
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
+          setIsFormOpen(isOpen);
+          if (!isOpen) setEditingSchema(null);
+      }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingSchema ? `Edit Schema: ${editingSchema.name}` : "Create New Content Schema"}</DialogTitle>
@@ -293,39 +276,15 @@ export default function SchemaBuilderPage() {
               Make sure the slug is unique.
             </DialogDescription>
           </DialogHeader>
-          
-          <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-            <div>
-                <Label htmlFor="schemaName">Schema Name</Label>
-                <Input id="schemaName" placeholder="e.g., Blog Post, Product, Event" defaultValue={editingSchema?.name}/>
-            </div>
-            <div>
-                <Label htmlFor="schemaSlug">Schema Slug (Collection Name)</Label>
-                <Input id="schemaSlug" placeholder="e.g., blog-posts, products (lowercase, hyphens)" defaultValue={editingSchema?.slug} disabled={!!editingSchema} />
-                 {editingSchema && <p className="text-xs text-muted-foreground mt-1">Slug cannot be changed after creation.</p>}
-            </div>
-             <div>
-                <Label htmlFor="schemaDescription">Description (Optional)</Label>
-                <Textarea id="schemaDescription" placeholder="Briefly describe what this content type is for." defaultValue={editingSchema?.description}/>
-            </div>
-            
-            <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm">Fields</CardTitle></CardHeader>
-                <CardContent>
-                    <p className="text-xs text-muted-foreground">This is where you would add, remove, and configure fields for your schema (e.g., text fields, image uploads, repeaters).</p>
-                    <div className="mt-2 p-4 border border-dashed rounded-md min-h-[100px] flex items-center justify-center">
-                        <span className="text-muted-foreground font-medium">Interactive Field Builder (Future Implementation)</span>
-                    </div>
-                </CardContent>
-            </Card>
-          </div>
-
-          <DialogFooter className="mt-2">
-            <Button variant="outline" onClick={() => setIsFormOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveSchema}>
-                {editingSchema ? "Save Changes" : "Create Schema"}
-            </Button>
-          </DialogFooter>
+          <SchemaForm
+            key={editingSchema ? editingSchema.id : 'new-schema'}
+            onSubmit={handleSaveSchema}
+            initialData={editingSchema}
+            onCancel={() => {
+                setIsFormOpen(false);
+                setEditingSchema(null);
+            }}
+          />
         </DialogContent>
       </Dialog>
     </div>
