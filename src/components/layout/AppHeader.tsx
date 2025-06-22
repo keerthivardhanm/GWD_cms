@@ -29,26 +29,32 @@ interface NotificationItem {
   title: string;
   message: string;
   time: string;
-  icon: React.ReactNode; // Can be a Lucide icon component
-  rawTimestamp?: Date; // For sorting if needed
+  icon: React.ReactNode; 
+  rawTimestamp?: Date;
 }
 
 const getIconForAction = (action: string) => {
   if (action.includes('CREATED')) return <UserCircle className="h-4 w-4 text-green-500" />;
   if (action.includes('UPDATED')) return <SettingsIcon className="h-4 w-4 text-blue-500" />;
-  if (action.includes('DELETED')) return <LogOutIcon className="h-4 w-4 text-red-500" />; // Re-using LogOutIcon for delete
+  if (action.includes('DELETED')) return <LogOutIcon className="h-4 w-4 text-red-500" />; 
   if (action.includes('LOGIN') || action.includes('LOGOUT')) return <UserCircle className="h-4 w-4 text-purple-500" />;
-  return <Bell className="h-4 w-4 text-gray-500" />; // Default
+  return <Bell className="h-4 w-4 text-gray-500" />; 
 };
 
 
 export function AppHeader() {
   const { user, userData, logout } = useAuth(); 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [loadingNotifications, setLoadingNotifications] = useState(true);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   useEffect(() => {
     const fetchNotifications = async () => {
+      // Only fetch if the user is an Admin
+      if (userData?.role !== 'Admin') {
+          setNotifications([]);
+          setLoadingNotifications(false);
+          return;
+      }
       setLoadingNotifications(true);
       try {
         const auditLogsQuery = query(collection(db, "auditLogs"), orderBy("timestamp", "desc"), limit(5));
@@ -68,16 +74,15 @@ export function AppHeader() {
         setNotifications(fetchedNotifications);
       } catch (error) {
         console.error("Error fetching notifications (audit logs):", error);
-        // Potentially set an error state for notifications
       } finally {
         setLoadingNotifications(false);
       }
     };
 
-    fetchNotifications();
-    // Optionally, set up a listener for real-time updates if needed, or refetch periodically
-    // For now, just fetch on mount.
-  }, []);
+    if(user && userData) {
+        fetchNotifications();
+    }
+  }, [user, userData]);
 
 
   const getInitials = (nameOrEmail?: string | null) => {
@@ -110,50 +115,52 @@ export function AppHeader() {
         />
       </div>
       
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" className="shrink-0 relative">
-            <Bell className="h-5 w-5" />
-            {notifications.length > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-              </span>
-            )}
-            <span className="sr-only">Toggle notifications</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-80 sm:w-96">
-          <DropdownMenuLabel className="flex justify-between items-center">
-            Recent Activity
-            {notifications.length > 0 && <Badge variant="secondary">{notifications.length} New</Badge>}
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <ScrollArea className="h-[300px]">
-            {loadingNotifications && (
-              <div className="p-4 text-center text-sm text-muted-foreground">Loading notifications...</div>
-            )}
-            {!loadingNotifications && notifications.length > 0 ? (
-              notifications.map(notification => (
-                <DropdownMenuItem key={notification.id} className="flex items-start gap-2.5 p-2.5 cursor-default">
-                  <div className="shrink-0 mt-0.5">{notification.icon}</div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium leading-tight">{notification.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{notification.message}</p>
-                    <p className="text-xs text-muted-foreground/70 mt-0.5">{notification.time}</p>
-                  </div>
-                </DropdownMenuItem>
-              ))
-            ) : (
-              !loadingNotifications && <div className="p-4 text-center text-sm text-muted-foreground">No new notifications</div>
-            )}
-          </ScrollArea>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem className="justify-center text-sm text-primary hover:!text-primary asChild">
-             <Link href="/audit-logs">View all activity</Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      { userData?.role === 'Admin' && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" className="shrink-0 relative">
+              <Bell className="h-5 w-5" />
+              {notifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                </span>
+              )}
+              <span className="sr-only">Toggle notifications</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-80 sm:w-96">
+            <DropdownMenuLabel className="flex justify-between items-center">
+              Recent Activity
+              {notifications.length > 0 && <Badge variant="secondary">{notifications.length} New</Badge>}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <ScrollArea className="h-[300px]">
+              {loadingNotifications && (
+                <div className="p-4 text-center text-sm text-muted-foreground">Loading notifications...</div>
+              )}
+              {!loadingNotifications && notifications.length > 0 ? (
+                notifications.map(notification => (
+                  <DropdownMenuItem key={notification.id} className="flex items-start gap-2.5 p-2.5 cursor-default">
+                    <div className="shrink-0 mt-0.5">{notification.icon}</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium leading-tight">{notification.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{notification.message}</p>
+                      <p className="text-xs text-muted-foreground/70 mt-0.5">{notification.time}</p>
+                    </div>
+                  </DropdownMenuItem>
+                ))
+              ) : (
+                !loadingNotifications && <div className="p-4 text-center text-sm text-muted-foreground">No new notifications</div>
+              )}
+            </ScrollArea>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="justify-center text-sm text-primary hover:!text-primary asChild">
+               <Link href="/audit-logs">View all activity</Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

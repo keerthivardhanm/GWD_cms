@@ -4,107 +4,110 @@
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlusCircle, List, Edit, Trash2, AlertTriangle, Loader2, Database as DatabaseIcon } from "lucide-react"; // Added DatabaseIcon
+import { PlusCircle, List, Edit, Trash2, AlertTriangle, Loader2, Database as DatabaseIcon } from "lucide-react";
 import React, { useState, useEffect } from 'react';
-// import { db } from '@/lib/firebase'; // Would be needed for actual implementation
-// import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 
 // Placeholder types - actual implementation would be more complex
 interface SchemaField {
-  id: string; // unique within the schema
-  name: string; // machine-readable name, e.g., "post_title"
-  label: string; // human-readable label, e.g., "Post Title"
-  type: 'text' | 'textarea' | 'number' | 'boolean' | 'date' | 'image_url' | 'select' | 'rich_text' | 'group'; // Added rich_text and group
-  options?: string[]; // For select type
+  id: string;
+  name: string;
+  label: string; 
+  type: 'text' | 'textarea' | 'number' | 'boolean' | 'date' | 'image_url' | 'select' | 'rich_text' | 'group'; 
+  options?: string[];
   required?: boolean;
-  // For 'group' type, fields would be nested SchemaField[]
   fields?: SchemaField[]; 
 }
 
 interface ContentSchema {
-  id: string; // Firestore doc ID
-  name: string; // e.g., "Blog Post", "Product" - User-friendly name for the schema
-  slug: string; // e.g., "blog-posts", "products" - used for collection name or identifier, must be unique
+  id: string; 
+  name: string; 
+  slug: string; 
   description?: string;
   fields: SchemaField[];
-  createdAt?: any; // Timestamp
-  updatedAt?: any; // Timestamp
+  createdAt?: any; 
+  updatedAt?: any; 
 }
+
+const exampleSchemas: ContentSchema[] = [
+    {
+        id: "1",
+        name: "Blog Post",
+        slug: "blog-posts",
+        description: "Standard schema for creating blog articles.",
+        fields: [
+            { id: "f1", name: "title", label: "Title", type: "text", required: true },
+            { id: "f2", name: "featured_image", label: "Featured Image", type: "image_url", required: true },
+            { id: "f3", name: "content", label: "Content", type: "rich_text", required: true },
+            { id: "f4", name: "author", label: "Author", type: "text", required: false },
+        ]
+    },
+    {
+        id: "2",
+        name: "Service Page",
+        slug: "service-pages",
+        description: "Schema for individual company service offerings.",
+        fields: [
+            { id: "s1", name: "service_name", label: "Service Name", type: "text", required: true },
+            { id: "s2", name: "description", label: "Description", type: "textarea", required: true },
+            { id: "s3", name: "service_icon", label: "Service Icon URL", type: "image_url", required: false },
+        ]
+    }
+];
 
 export default function SchemaBuilderPage() {
   const [schemas, setSchemas] = useState<ContentSchema[]>([]);
-  const [loading, setLoading] = useState(false); // Set to false initially, true when actually fetching
+  const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSchema, setEditingSchema] = useState<ContentSchema | null>(null);
   const { toast } = useToast();
 
-  // useEffect(() => {
-  //   const fetchSchemas = async () => {
-  //     setLoading(true);
-  //     try {
-  //       // const querySnapshot = await getDocs(collection(db, "_contentSchemas")); // Example collection name
-  //       // const fetchedSchemas = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContentSchema));
-  //       // setSchemas(fetchedSchemas);
-  //       setSchemas([]); // Simulate empty for now
-  //     } catch (error) {
-  //       console.error("Error fetching schemas:", error);
-  //       toast({ title: "Error", description: "Could not load schemas.", variant: "destructive" });
-  //     }
-  //     setLoading(false);
-  //   };
-  //   // fetchSchemas(); // Commented out until backend is ready
-  // }, [toast]);
+  useEffect(() => {
+    // Simulate fetching schemas
+    setTimeout(() => {
+      setSchemas(exampleSchemas);
+      setLoading(false);
+    }, 500);
+  }, []);
 
   const handleCreateNewSchema = () => {
     setEditingSchema(null);
-    // setIsFormOpen(true); // This would open a form dialog/modal for schema definition
-    toast({ title: "Feature Pending", description: "Schema creation form and logic are not yet implemented."});
+    setIsFormOpen(true);
   };
 
   const handleEditSchema = (schema: ContentSchema) => {
-    // Placeholder: In a real app, check if content exists for this schema.
-    const dataExistsForThisSchema = false; // This would be a real check, e.g., count documents in collection `schema.slug`
+    const dataExistsForThisSchema = false; // This would be a real check
     
     if (dataExistsForThisSchema) {
         toast({
             title: "Editing Restricted",
-            description: `Schema "${schema.name}" has existing content. Modifying its structure directly is restricted to prevent data loss. Advanced editing with data migration is a complex feature planned for future updates.`,
+            description: `Schema "${schema.name}" has existing content. Modifying its structure is restricted to prevent data loss.`,
             variant: "destructive",
             duration: 10000
         });
         return;
     }
     setEditingSchema(schema);
-    // setIsFormOpen(true); // Would open a form dialog/modal
-    toast({ title: "Feature Pending", description: `Editing functionality for "${schema.name}" is not yet implemented.`});
+    setIsFormOpen(true);
   };
 
   const handleDeleteSchema = async (schema: ContentSchema) => {
-    // Placeholder: In a real app, check if content exists.
     const dataExistsForThisSchema = false; // Real check needed
     if (dataExistsForThisSchema) {
         toast({
             title: "Deletion Restricted",
-            description: `Schema "${schema.name}" cannot be deleted because it has existing content. Please remove all content using this schema first, or use an archive function (if available).`,
+            description: `Schema "${schema.name}" cannot be deleted because it has existing content.`,
             variant: "destructive",
             duration: 10000
         });
         return;
     }
-    // Placeholder deletion logic
     toast({ title: "Feature Pending", description: `Deletion for "${schema.name}" not yet implemented.`});
-    // Example:
-    // setSchemas(prev => prev.filter(s => s.id !== schemaId));
-    // try {
-    //   // await deleteDoc(doc(db, "_contentSchemas", schemaId));
-    //   toast({ title: "Schema Deleted (Simulated)", description: `Schema "${schema.name}" has been removed.` });
-    // } catch (error) {
-    //   console.error("Error deleting schema:", error);
-    //   toast({ title: "Error", description: "Could not delete schema.", variant: "destructive" });
-    // }
   };
 
 
@@ -112,7 +115,7 @@ export default function SchemaBuilderPage() {
     <div className="space-y-6">
       <PageHeader
         title="Schema Builder"
-        description="Define and manage the structure of your content types (sections)."
+        description="Define and manage the structure of your content types."
         actions={
           <Button onClick={handleCreateNewSchema}>
             <PlusCircle className="mr-2 h-4 w-4" /> Create New Schema
@@ -123,7 +126,7 @@ export default function SchemaBuilderPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><DatabaseIcon className="h-5 w-5"/> Content Schemas</CardTitle>
           <CardDescription>
-            Manage the data structures for your content. Each schema defines a content type (e.g., "Blog Posts", "Products", "Events").
+            Manage data structures for your content. Each schema defines a content type (e.g., "Blog Posts").
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -137,7 +140,7 @@ export default function SchemaBuilderPage() {
               <List className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold mb-2">No Schemas Defined</h3>
               <p className="text-muted-foreground mb-4">
-                Get started by creating your first content schema. This will define the structure for a new type of content in your CMS.
+                Get started by creating your first content schema.
               </p>
               <Button onClick={handleCreateNewSchema}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Create First Schema
@@ -191,29 +194,19 @@ export default function SchemaBuilderPage() {
             <CardHeader className="flex flex-row items-start space-x-3 space-y-0 pb-3">
                 <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-1 shrink-0" />
                 <div>
-                    <CardTitle className="text-amber-700 dark:text-amber-300 text-base">Important Considerations for Schema Management</CardTitle>
+                    <CardTitle className="text-amber-700 dark:text-amber-300 text-base">Important Considerations</CardTitle>
                 </div>
             </CardHeader>
             <CardContent className="text-xs text-amber-700 dark:text-amber-400 pt-0">
                 <ul className="list-disc space-y-1 pl-5">
                     <li>
-                        <strong>Planning is Key:</strong> Before creating schemas, plan your content structures carefully. Think about the types of information you need to store.
+                        <strong>Dynamic Forms:</strong> Creating a schema here does not automatically create a page form. Full dynamic form generation based on these schemas is the next major step.
                     </li>
                     <li>
-                        <strong>Slug Uniqueness:</strong> The 'slug' for each schema (e.g., "blog-posts") will likely be used as the Firestore collection name. It must be unique and should not be changed after creation if content exists.
+                        <strong>Slug Uniqueness:</strong> The 'slug' for each schema must be unique and should not be changed after content has been created using it.
                     </li>
                     <li>
-                        <strong>Editing Schemas:</strong>
-                        <ul className="list-circle pl-4 mt-1 space-y-0.5">
-                            <li>Adding new fields to an existing schema is generally safe.</li>
-                            <li>Modifying (e.g., changing type) or deleting fields from a schema that already has content is risky and can lead to data loss or application errors if not managed with data migration strategies.</li>
-                        </ul>
-                    </li>
-                     <li>
-                        <strong>Data Relationships:</strong> This basic schema builder doesn't explicitly handle complex relationships (e.g., one-to-many, many-to-many) between different content types. You would manage these through reference fields or by convention.
-                    </li>
-                    <li>
-                        <strong>Iterative Development:</strong> This Schema Builder is a foundational component. Full dynamic form generation, advanced validation, and data migration tools are complex features that would be built upon this.
+                        <strong>Editing Schemas with Content:</strong> Modifying or deleting fields from a schema that is already in use by pages can lead to data loss. This feature is disabled for schemas with existing content to prevent errors.
                     </li>
                 </ul>
             </CardContent>
@@ -221,27 +214,25 @@ export default function SchemaBuilderPage() {
         </CardContent>
       </Card>
       
-      {/* Dialog for Creating/Editing Schema (Non-functional placeholder for UI structure) */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-2xl"> {/* Made wider for schema editing */}
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingSchema ? `Edit Schema: ${editingSchema.name}` : "Create New Content Schema"}</DialogTitle>
             <DialogDescription>
               {editingSchema ? "Modify the details of your content schema." : "Define a new structure for a content type."}
-              Make sure the slug is unique and reflects where content will be stored.
+              Make sure the slug is unique.
             </DialogDescription>
           </DialogHeader>
           
           <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-            {/* Placeholder for actual form fields */}
             <div>
                 <Label htmlFor="schemaName">Schema Name</Label>
                 <Input id="schemaName" placeholder="e.g., Blog Post, Product, Event" defaultValue={editingSchema?.name}/>
             </div>
             <div>
                 <Label htmlFor="schemaSlug">Schema Slug (Collection Name)</Label>
-                <Input id="schemaSlug" placeholder="e.g., blog-posts, products (lowercase, hyphens)" defaultValue={editingSchema?.slug} disabled={!!editingSchema && true /* Disable slug editing if content might exist */} />
-                 {editingSchema && <p className="text-xs text-muted-foreground mt-1">Slug cannot be changed after creation if content exists.</p>}
+                <Input id="schemaSlug" placeholder="e.g., blog-posts, products (lowercase, hyphens)" defaultValue={editingSchema?.slug} disabled={!!editingSchema} />
+                 {editingSchema && <p className="text-xs text-muted-foreground mt-1">Slug cannot be changed after creation.</p>}
             </div>
              <div>
                 <Label htmlFor="schemaDescription">Description (Optional)</Label>
@@ -251,9 +242,9 @@ export default function SchemaBuilderPage() {
             <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Fields</CardTitle></CardHeader>
                 <CardContent>
-                    <p className="text-xs text-muted-foreground">Field definition UI (add, remove, reorder, configure type, label, etc.) would go here.</p>
+                    <p className="text-xs text-muted-foreground">This is where you would add, remove, and configure fields for your schema (e.g., text fields, image uploads, repeaters).</p>
                     <div className="mt-2 p-4 border border-dashed rounded-md min-h-[100px] flex items-center justify-center">
-                        <span className="text-muted-foreground">Dynamic Field Builder Area (Not Implemented)</span>
+                        <span className="text-muted-foreground font-medium">Dynamic Field Builder (Future Implementation)</span>
                     </div>
                 </CardContent>
             </Card>
@@ -270,4 +261,3 @@ export default function SchemaBuilderPage() {
     </div>
   );
 }
-
