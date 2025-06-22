@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -11,17 +10,15 @@ import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, updateDoc, doc, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, serverTimestamp, query, orderBy, Timestamp, where, deleteField } from 'firebase/firestore';
 import { logAuditEvent } from '@/lib/auditLogger';
 
 interface Task {
   id: string;
   text: string;
-  completed: boolean;
+  completedBy: Record<string, Timestamp>;
+  assignedTo: string[];
   createdAt: Timestamp;
-  createdBy: { userId: string; userName: string };
-  completedBy?: { userId: string; userName: string };
-  completedAt?: Timestamp;
 }
 
 export function SharedTasks() {
@@ -31,19 +28,27 @@ export function SharedTasks() {
   const { user, userData } = useAuth();
 
   const fetchTasks = useCallback(async () => {
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
-      const tasksQuery = query(collection(db, "sharedTasks"), orderBy("createdAt", "desc"));
+      const tasksQuery = query(
+        collection(db, "tasks"), 
+        where("assignedTo", "array-contains", user.uid), 
+        orderBy("createdAt", "desc")
+      );
       const querySnapshot = await getDocs(tasksQuery);
       const fetchedTasks = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
       setTasks(fetchedTasks);
     } catch (error) {
       console.error("Error fetching tasks:", error);
-      toast({ title: "Error", description: "Could not fetch shared tasks.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not fetch your assigned tasks.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, user]);
 
   useEffect(() => {
     if (user) {
@@ -51,21 +56,21 @@ export function SharedTasks() {
     }
   }, [fetchTasks, user]);
 
-  const handleToggleTask = async (taskId: string, currentStatus: boolean, taskText: string) => {
+  const handleToggleTask = async (task: Task) => {
     if (!user || !userData) return;
     
-    const taskRef = doc(db, "sharedTasks", taskId);
+    const taskRef = doc(db, "tasks", task.id);
+    const isCompleted = task.completedBy && task.completedBy[user.uid];
+
     const updateData = {
-      completed: !currentStatus,
-      completedBy: { userId: user.uid, userName: userData.name },
-      completedAt: serverTimestamp(),
+      [`completedBy.${user.uid}`]: isCompleted ? deleteField() : serverTimestamp()
     };
     
     try {
       await updateDoc(taskRef, updateData);
-      if (updateData.completed) {
-        await logAuditEvent(user, userData, 'TASK_COMPLETED', 'SharedTask', taskId, taskText);
-        toast({ title: "Task Completed!", description: `Great job on finishing "${taskText.substring(0, 20)}...".`});
+      if (!isCompleted) {
+        await logAuditEvent(user, userData, 'TASK_COMPLETED', 'Task', task.id, task.text);
+        toast({ title: "Task Completed!", description: `Great job on finishing "${task.text.substring(0, 20)}...".`});
       }
       fetchTasks();
     } catch (error) {
@@ -75,26 +80,27 @@ export function SharedTasks() {
   };
   
   const sortedTasks = React.useMemo(() => {
+    if (!user) return [];
     return [...tasks].sort((a, b) => {
-      if (a.completed === b.completed) {
-        if (a.completed && a.completedAt && b.completedAt) {
-            return b.completedAt.toMillis() - a.completedAt.toMillis();
-        }
+      const aCompleted = a.completedBy && a.completedBy[user.uid];
+      const bCompleted = b.completedBy && b.completedBy[user.uid];
+
+      if (!!aCompleted === !!bCompleted) {
         return b.createdAt.toMillis() - a.createdAt.toMillis();
       }
-      return a.completed ? 1 : -1;
+      return aCompleted ? 1 : -1;
     });
-  }, [tasks]);
+  }, [tasks, user]);
 
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 lg:col-span-1">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ListChecks className="h-5 w-5" />
-          Shared Tasks
+          My Assigned Tasks
         </CardTitle>
         <CardDescription>
-          A list of tasks for the team. Check them off as you go.
+          A list of tasks assigned to you by an admin.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -107,38 +113,36 @@ export function SharedTasks() {
           )}
           {!isLoading && tasks.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-4">
-                No tasks assigned right now. Great job!
+                You have no assigned tasks. Great job!
             </p>
           )}
           {!isLoading && tasks.length > 0 && (
             <ScrollArea className="h-[280px] space-y-2 pr-3">
-              {sortedTasks.map(task => (
-                <div key={task.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-b-0">
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                    <Checkbox
-                      id={`task-${task.id}`}
-                      checked={task.completed}
-                      onCheckedChange={() => handleToggleTask(task.id, task.completed, task.text)}
-                      aria-label={task.completed ? `Mark task '${task.text}' as incomplete` : `Mark task '${task.text}' as complete`}
-                      className="mt-1"
-                    />
-                    <div className="flex-1">
-                        <Label
-                        htmlFor={`task-${task.id}`}
-                        className={`flex-1 break-words cursor-pointer ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
-                        title={task.text}
-                        >
-                        {task.text}
-                        </Label>
-                        {task.completed && task.completedBy && (
-                            <p className="text-xs text-muted-foreground/80 mt-1">
-                                Completed by {task.completedBy.userName}
-                            </p>
-                        )}
+              {sortedTasks.map(task => {
+                const isCurrentUserCompleted = task.completedBy && !!task.completedBy[user?.uid || ''];
+                return (
+                    <div key={task.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-b-0">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <Checkbox
+                        id={`task-${task.id}`}
+                        checked={isCurrentUserCompleted}
+                        onCheckedChange={() => handleToggleTask(task)}
+                        aria-label={isCurrentUserCompleted ? `Mark task '${task.text}' as incomplete` : `Mark task '${task.text}' as complete`}
+                        className="mt-1"
+                        />
+                        <div className="flex-1">
+                            <Label
+                            htmlFor={`task-${task.id}`}
+                            className={`flex-1 break-words cursor-pointer ${isCurrentUserCompleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}
+                            title={task.text}
+                            >
+                            {task.text}
+                            </Label>
+                        </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                    </div>
+                );
+              })}
             </ScrollArea>
           )}
         </div>
