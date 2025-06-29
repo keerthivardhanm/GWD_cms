@@ -1,16 +1,16 @@
 
 "use client";
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/context/AuthContext';
@@ -64,7 +64,12 @@ export default function LoginPage() {
         await sendPasswordResetEmail(auth, data.email);
         toast({
             title: "Password Reset Email Sent",
-            description: "If an account with that email exists, a reset link has been sent. Please check your inbox and spam folder.",
+            description: (
+                <div>
+                    <p>If an account exists for {data.email}, a reset link has been sent.</p>
+                    <p className="mt-2 text-xs text-muted-foreground">Please check your inbox and spam folder.</p>
+                </div>
+            ),
         });
         setIsResetDialogOpen(false);
         resetForm.reset();
@@ -96,75 +101,85 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40 p-4">
-      <div className="mb-8 text-center">
-        <ShieldCheck className="mx-auto h-16 w-16 text-primary mb-4" data-ai-hint="app logo shield" />
-        <h1 className="text-3xl font-bold text-foreground mt-2">Welcome to {APP_NAME}</h1>
-        <p className="text-muted-foreground">Sign in to access your dashboard.</p>
-      </div>
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-xl">Login</CardTitle>
-          <CardDescription>Enter your email and password below to login.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
-            <div className="space-y-1">
+    <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2">
+      <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto grid w-[380px] gap-6">
+          <div className="grid gap-2 text-center">
+             <ShieldCheck className="mx-auto h-12 w-12 text-primary" data-ai-hint="app logo shield" />
+            <h1 className="text-3xl font-bold">Welcome to {APP_NAME}</h1>
+            <p className="text-balance text-muted-foreground">
+              Sign in to manage your content
+            </p>
+          </div>
+          <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="grid gap-4">
+            <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="m@example.com" {...loginForm.register("email")} />
-              {loginForm.formState.errors.email && <p className="text-sm text-destructive">{loginForm.formState.errors.email.message}</p>}
+              <Input
+                id="email"
+                type="email"
+                placeholder="m@example.com"
+                {...loginForm.register("email")}
+              />
+               {loginForm.formState.errors.email && <p className="text-sm text-destructive">{loginForm.formState.errors.email.message}</p>}
             </div>
-            <div className="space-y-1">
+            <div className="grid gap-2">
               <div className="flex items-center">
                 <Label htmlFor="password">Password</Label>
-                 <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant="link" type="button" className="ml-auto h-auto p-0 text-sm">
-                            Forgot your password?
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Reset Password</DialogTitle>
-                            <DialogDescription>
-                                Enter your email address below and we'll send you a link to reset your password.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={resetForm.handleSubmit(onResetSubmit)} className="space-y-4">
-                            <div className="space-y-1">
-                                <Label htmlFor="reset-email">Email</Label>
-                                <Input id="reset-email" type="email" placeholder="m@example.com" {...resetForm.register("email")} />
-                                {resetForm.formState.errors.email && <p className="text-sm text-destructive">{resetForm.formState.errors.email.message}</p>}
-                            </div>
-                            <DialogFooter>
-                                <Button type="button" variant="outline" onClick={() => setIsResetDialogOpen(false)}>Cancel</Button>
-                                <Button type="submit" disabled={resetForm.formState.isSubmitting}>
-                                    {resetForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Send Reset Link
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                 </Dialog>
+                <Button variant="link" type="button" onClick={() => setIsResetDialogOpen(true)} className="ml-auto h-auto p-0 text-sm">
+                    Forgot your password?
+                </Button>
               </div>
               <Input id="password" type="password" {...loginForm.register("password")} />
-              {loginForm.formState.errors.password && <p className="text-sm text-destructive">{loginForm.formState.errors.password.message}</p>}
+               {loginForm.formState.errors.password && <p className="text-sm text-destructive">{loginForm.formState.errors.password.message}</p>}
             </div>
             <Button type="submit" className="w-full" disabled={loginForm.formState.isSubmitting || authLoading}>
-              {loginForm.formState.isSubmitting || authLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+               {loginForm.formState.isSubmitting || authLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Login
             </Button>
           </form>
-        </CardContent>
-         <CardFooter className="flex-col items-start text-sm">
-            <p className="text-muted-foreground">
-                Don&apos;t have an account?{' '}
-                <Link href="#" className="underline">
-                    Contact Support
-                </Link>
-            </p>
-        </CardFooter>
-      </Card>
+          <div className="mt-4 text-center text-sm">
+            Don&apos;t have an account?{" "}
+            <Link href="#" className="underline">
+              Contact Support
+            </Link>
+          </div>
+        </div>
+      </div>
+      <div className="hidden bg-muted lg:block">
+        <Image
+          src="https://placehold.co/1080x1920"
+          alt="Abstract background"
+          width="1080"
+          height="1920"
+          className="h-full w-full object-cover dark:brightness-[0.3]"
+          data-ai-hint="abstract background"
+          priority
+        />
+      </div>
+
+      <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                  <DialogTitle>Reset Password</DialogTitle>
+                  <DialogDescription>
+                      Enter your email address below and we will send you a link to reset your password.
+                  </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={resetForm.handleSubmit(onResetSubmit)} className="space-y-4 pt-4">
+                  <div className="grid gap-2">
+                      <Label htmlFor="reset-email" className="text-left">Email</Label>
+                      <Input id="reset-email" type="email" placeholder="m@example.com" {...resetForm.register("email")} />
+                      {resetForm.formState.errors.email && <p className="text-sm text-destructive">{resetForm.formState.errors.email.message}</p>}
+                  </div>
+                  <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setIsResetDialogOpen(false)}>Cancel</Button>
+                      <Button type="submit" disabled={resetForm.formState.isSubmitting}>
+                          {resetForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          Send Reset Link
+                      </Button>
+                  </DialogFooter>
+              </form>
+          </DialogContent>
+       </Dialog>
     </div>
   );
-}
