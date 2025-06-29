@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview An AI flow to generate a content schema from a JSON object.
@@ -27,29 +28,30 @@ const prompt = ai.definePrompt({
   name: 'generateSchemaPrompt',
   input: { schema: GenerateSchemaInputSchema },
   output: { schema: contentSchemaFormSchema },
-  prompt: `You are an expert system designer who creates content management system (CMS) schemas. Your task is to analyze the provided JSON content and generate a valid schema object that can be used to represent this data.
+  prompt: `You are an expert system designer who creates content management system (CMS) schemas. Your task is to analyze the provided JSON content, which describes the desired schema structure, and generate a valid schema object that can be used to represent this data.
 
-  Follow these rules precisely:
-  1.  **Schema Name and Description**: Infer a descriptive 'name' and 'description' for the schema based on the JSON content.
-  2.  **Slug**: Create a URL-friendly 'slug' from the schema name. It must be lowercase, alphanumeric, with words separated by hyphens (e.g., 'blog-post').
-  3.  **Fields**: Analyze the keys in the JSON object to create the 'fields' array.
-  4.  **Field Naming**: For each field, the 'name' must be the original JSON key, converted to snake_case if it isn't already (e.g., "userName" becomes "user_name").
-  5.  **Field Labels**: The 'label' should be a human-readable version of the key (e.g., "user_name" becomes "User Name").
-  6.  **Field Types**: Infer the 'type' for each field based on its value:
-      *   String values that look like long text should be 'textarea'.
-      *   String values that look like URLs (especially for images) should be 'image_url'.
-      *   Other string values should be 'text'.
-      *   Number values should be 'number'.
-      *   Boolean values should be 'boolean'.
-      *   An array of objects should be a 'repeater' type. You MUST recursively define the 'fields' for the objects inside the repeater array.
-      *   Do NOT use a 'repeater' for an array of simple strings or numbers; this is not supported.
-  7.  **Required**: Set 'required' to false for all fields.
-  8.  **IDs**: Ensure every field, including sub-fields within repeaters, has a unique 'id' generated using a UUID-like random string.
+The input JSON is a dictionary where each key is the desired field name and each value is a string describing the data type for that field.
 
-  Analyze the following JSON content:
-  \`\`\`json
-  {{{jsonContent}}}
-  \`\`\`
+Follow these rules precisely:
+1.  **Schema Name and Description**: Infer a descriptive 'name' and 'description' for the schema based on the overall structure and field names provided in the JSON. For example, if fields are "title", "author", "publish_date", a good name would be "Blog Post".
+2.  **Slug**: Create a URL-friendly 'slug' from the schema name. It must be lowercase, alphanumeric, with words separated by hyphens (e.g., 'blog-post').
+3.  **Fields**: Iterate through the key-value pairs in the input JSON to create the 'fields' array in the output schema.
+4.  **Field Naming**: For each field, the 'name' must be the original JSON key.
+5.  **Field Labels**: The 'label' should be a human-readable version of the key (e.g., "role" becomes "Role", "experience" becomes "Experience").
+6.  **Field Types**: Determine the 'type' for each field by interpreting the string value from the input JSON:
+    *   If the value is \`string (URL)\` or \`string (Image URL)\`, the type should be \`image_url\`.
+    *   If the value is \`string\` and the key suggests long content (e.g., \`description\`, \`bio\`, \`content\`, \`details\`), the type should be \`textarea\`.
+    *   If the value is \`string\`, the type should be \`text\`.
+    *   If the value is \`number\`, the type should be \`number\`.
+    *   If the value is \`boolean\`, the type should be \`boolean\`.
+    *   The model does not yet support \`repeater\` types from this JSON format.
+7.  **Required**: Set 'required' to false for all fields by default.
+8.  **IDs**: Ensure every field has a unique 'id' generated using a UUID-like random string.
+
+Analyze the following JSON content which defines the schema structure:
+\`\`\`json
+{{{jsonContent}}}
+\`\`\`
   `,
 });
 
