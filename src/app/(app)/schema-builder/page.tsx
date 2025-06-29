@@ -4,7 +4,7 @@
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlusCircle, List, Edit, Trash2, AlertTriangle, Loader2, Database as DatabaseIcon } from "lucide-react";
+import { PlusCircle, List, Edit, Trash2, AlertTriangle, Loader2, Database as DatabaseIcon, Sparkles } from "lucide-react";
 import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,16 +14,25 @@ import { collection, getDocs, query, where, limit, doc, addDoc, updateDoc, delet
 import { useAuth } from "@/context/AuthContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SchemaForm, type ContentSchema, type ContentSchemaFormValues } from '@/components/forms/SchemaForm';
+import { generateSchemaFromJson } from '@/ai/flows/generate-schema-from-json-flow';
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 export default function SchemaBuilderPage() {
   const [schemas, setSchemas] = useState<ContentSchema[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSchema, setEditingSchema] = useState<ContentSchema | null>(null);
+  const [formInitialData, setFormInitialData] = useState<Partial<ContentSchema> | null>(null);
   const { toast } = useToast();
   const { user, userData } = useAuth();
   
   const [contentExistsMap, setContentExistsMap] = useState<Record<string, boolean>>({});
+
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [jsonInput, setJsonInput] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
 
   const checkContentExists = useCallback(async (schemaSlug: string) => {
     if (!schemaSlug) return false;
@@ -72,14 +81,41 @@ export default function SchemaBuilderPage() {
 
   const handleCreateNewSchema = () => {
     setEditingSchema(null);
+    setFormInitialData(null);
     setIsFormOpen(true);
   };
 
   const handleEditSchema = (schema: ContentSchema) => {
     setEditingSchema(schema);
+    setFormInitialData(schema);
     setIsFormOpen(true);
   };
   
+  const handleGenerateSchemaFromJSON = async () => {
+    if (!jsonInput.trim()) {
+      toast({ title: "Error", description: "JSON content cannot be empty.", variant: "destructive" });
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const generatedSchema = await generateSchemaFromJson({ jsonContent: jsonInput });
+      
+      setEditingSchema(null); // Ensure we're in "create" mode
+      setFormInitialData(generatedSchema);
+      
+      setIsImportDialogOpen(false);
+      setIsFormOpen(true);
+      setJsonInput(''); // Clear input for next time
+      toast({ title: "Schema Generated!", description: "Review and save the AI-generated schema." });
+
+    } catch (error) {
+      console.error("AI Schema Generation Error:", error);
+      toast({ title: "AI Error", description: "Failed to generate schema from JSON. Please ensure the JSON is valid.", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleSaveSchema = async (values: ContentSchemaFormValues) => {
     if (!user) {
         toast({ title: "Not Authenticated", description: "You must be logged in to save a schema.", variant: "destructive"});
@@ -119,11 +155,12 @@ export default function SchemaBuilderPage() {
       <PageHeader
         title="Schema Builder"
         description="Define and manage the structure of your content types."
-        actions={
-          <Button onClick={handleCreateNewSchema}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Create New Schema
-          </Button>
-        }
+        actions={<>
+            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}><Sparkles className="mr-2 h-4 w-4" /> Create from JSON (AI)</Button>
+            <Button onClick={handleCreateNewSchema}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Create New Schema
+            </Button>
+        </>}
       />
       <Card>
         <CardHeader>
@@ -143,7 +180,7 @@ export default function SchemaBuilderPage() {
               <List className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold mb-2">No Schemas Defined</h3>
               <p className="text-muted-foreground mb-4">
-                Get started by creating your first content schema.
+                Get started by creating your first content schema or importing from JSON.
               </p>
               <Button onClick={handleCreateNewSchema}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Create First Schema
@@ -250,13 +287,10 @@ export default function SchemaBuilderPage() {
             <CardContent className="text-xs text-amber-700 dark:text-amber-400 pt-0">
                 <ul className="list-disc space-y-1 pl-5">
                     <li>
-                        <strong>Dynamic Forms:</strong> Creating a schema here does not automatically create a page form. Full dynamic form generation based on these schemas is the next major step. For now, schemas for existing page types are hardcoded for stability.
+                        <strong>Slug Uniqueness:</strong> The 'slug' for each schema must be unique and cannot be changed after creation to ensure content relationships remain intact.
                     </li>
                     <li>
-                        <strong>Slug Uniqueness:</strong> The 'slug' for each schema must be unique and should not be changed after content has been created using it.
-                    </li>
-                    <li>
-                        <strong>Editing Schemas with Content:</strong> Modifying or deleting fields from a schema that is already in use by pages can lead to data loss. This feature is disabled for schemas with existing content to prevent errors.
+                        <strong>Editing Schemas with Content:</strong> Modifying or deleting fields from a schema that is already in use by pages is disabled to prevent data loss or display errors on your live site.
                     </li>
                 </ul>
             </CardContent>
@@ -264,9 +298,41 @@ export default function SchemaBuilderPage() {
         </CardContent>
       </Card>
       
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Create Schema from JSON (AI)</DialogTitle>
+            <DialogDescription>
+              Paste a JSON object below. The AI will analyze its structure and generate a content schema for you to review and save.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div>
+              <Label htmlFor="json-input">JSON Content</Label>
+              <Textarea 
+                id="json-input"
+                placeholder='{ "title": "Example", "author": "AI" }'
+                value={jsonInput}
+                onChange={(e) => setJsonInput(e.target.value)}
+                rows={10}
+                className="font-mono text-xs"
+              />
+            </div>
+            <Button onClick={handleGenerateSchemaFromJSON} disabled={isGenerating} className="w-full">
+              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4"/>}
+              {isGenerating ? "Analyzing..." : "Generate Schema"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
           setIsFormOpen(isOpen);
-          if (!isOpen) setEditingSchema(null);
+          if (!isOpen) {
+            setEditingSchema(null);
+            setFormInitialData(null);
+          }
       }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -277,12 +343,13 @@ export default function SchemaBuilderPage() {
             </DialogDescription>
           </DialogHeader>
           <SchemaForm
-            key={editingSchema ? editingSchema.id : 'new-schema'}
+            key={formInitialData ? (formInitialData as ContentSchema).id || 'generated-schema' : 'new-schema'}
             onSubmit={handleSaveSchema}
-            initialData={editingSchema}
+            initialData={formInitialData}
             onCancel={() => {
                 setIsFormOpen(false);
                 setEditingSchema(null);
+                setFormInitialData(null);
             }}
           />
         </DialogContent>

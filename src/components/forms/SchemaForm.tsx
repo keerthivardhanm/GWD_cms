@@ -52,7 +52,7 @@ export interface ContentSchema extends ContentSchemaFormValues {
 
 interface SchemaFormProps {
   onSubmit: (values: ContentSchemaFormValues) => Promise<void>;
-  initialData?: ContentSchema | null;
+  initialData?: Partial<ContentSchema> | null;
   onCancel: () => void;
 }
 
@@ -146,9 +146,9 @@ export function SchemaForm({ onSubmit, initialData, onCancel }: SchemaFormProps)
                     </div>
                     <div>
                         <Label htmlFor="slug">Schema Slug (API Identifier)</Label>
-                        <Input id="slug" {...register("slug")} placeholder="e.g., blog-posts (lowercase, hyphens)" disabled={!!initialData} />
+                        <Input id="slug" {...register("slug")} placeholder="e.g., blog-posts (lowercase, hyphens)" disabled={!!initialData?.id} />
                         {errors.slug && <p className="text-sm text-destructive mt-1">{errors.slug.message}</p>}
-                        {!!initialData && <p className="text-xs text-muted-foreground mt-1">Slug cannot be changed after creation.</p>}
+                        {!!initialData?.id && <p className="text-xs text-muted-foreground mt-1">Slug cannot be changed after creation.</p>}
                     </div>
                     <div>
                         <Label htmlFor="description">Description (Optional)</Label>
@@ -247,7 +247,7 @@ export function SchemaForm({ onSubmit, initialData, onCancel }: SchemaFormProps)
             Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Create Schema')}
+            {isSubmitting ? 'Saving...' : (initialData?.id ? 'Save Changes' : 'Create Schema')}
             </Button>
         </div>
         </form>
