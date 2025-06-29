@@ -29,27 +29,32 @@ const prompt = ai.definePrompt({
   model: 'googleai/gemini-1.5-flash-latest',
   input: { schema: GenerateSchemaInputSchema },
   output: { schema: contentSchemaFormSchema },
-  prompt: `You are an expert system designer who creates content management system (CMS) schemas. Your task is to analyze the provided JSON content, which describes the desired schema structure, and generate a valid schema object that can be used to represent this data.
+  prompt: `You are an expert system designer who creates content management system (CMS) schemas. Your task is to analyze the provided JSON content and generate a valid schema object that can be used to represent this data.
 
-The input JSON is a dictionary where each key is the desired field name and each value is a string describing the data type for that field.
+The JSON can be in one of two formats:
+1.  **Flat Object**: A simple dictionary where each key is a field name and the value is a string describing the data type.
+2.  **Nested Array Object**: An object with a single key, where the value is an array containing a sample object. This represents a list of items, and you should create a 'repeater' field for it.
 
 Follow these rules precisely:
-1.  **Schema Name and Description**: Infer a descriptive 'name' and 'description' for the schema based on the overall structure and field names provided in the JSON. For example, if fields are "title", "author", "publish_date", a good name would be "Blog Post".
-2.  **Slug**: Create a URL-friendly 'slug' from the schema name. It must be lowercase, alphanumeric, with words separated by hyphens (e.g., 'blog-post').
-3.  **Fields**: Iterate through the key-value pairs in the input JSON to create the 'fields' array in the output schema.
-4.  **Field Naming**: For each field, the 'name' must be the original JSON key.
-5.  **Field Labels**: The 'label' should be a human-readable version of the key (e.g., "role" becomes "Role", "experience" becomes "Experience").
-6.  **Field Types**: Determine the 'type' for each field by interpreting the string value from the input JSON:
+1.  **Schema Name and Description**:
+    *   For a **Flat Object**, infer a descriptive 'name' and 'description' from the field names (e.g., "title", "author" -> "Blog Post").
+    *   For a **Nested Array Object** (e.g., \`{"jobs": [...]}\`), use the array's key ("jobs") to create the schema name (e.g., "Jobs").
+2.  **Slug**: Create a URL-friendly 'slug' from the schema name. It must be lowercase, alphanumeric, with words separated by hyphens (e.g., 'blog-post', 'jobs').
+3.  **Field Generation**:
+    *   For a **Flat Object**, create a 'fields' array where each item corresponds to a key-value pair in the JSON.
+    *   For a **Nested Array Object**, create a 'fields' array with a *single field* of type \`repeater\`. The \`name\` and \`label\` of this repeater should come from the JSON key (e.g., "jobs"). The sub-fields of this repeater should be generated from the keys of the first object inside the array.
+4.  **Field Filtering**: **Crucially, ignore any JSON keys that end with \`_class\`, \`_icon_class\`, or contain the word 'button'.** These are presentational details and should not be part of the data schema.
+5.  **Field Naming**: For each field or sub-field, the 'name' must be the original JSON key.
+6.  **Field Labels**: The 'label' should be a human-readable version of the key (e.g., "job_title" becomes "Job Title").
+7.  **Field Types**: Determine the 'type' for each field by interpreting its string value from the JSON:
     *   If the value is \`string (URL)\` or \`string (Image URL)\`, the type should be \`image_url\`.
-    *   If the value is \`string\` and the key suggests long content (e.g., \`description\`, \`bio\`, \`content\`, \`details\`), the type should be \`textarea\`.
-    *   If the value is \`string\`, the type should be \`text\`.
+    *   If the value is \`string\` and the key suggests long content (e.g., \`description\`, \`bio\`, \`content\`), the type should be \`textarea\`. Otherwise, it should be \`text\`.
     *   If the value is \`number\`, the type should be \`number\`.
     *   If the value is \`boolean\`, the type should be \`boolean\`.
-    *   The model does not yet support \`repeater\` types from this JSON format.
-7.  **Required**: Set 'required' to false for all fields by default.
-8.  **IDs**: Ensure every field has a unique 'id' generated using a UUID-like random string.
+8.  **Required**: Set 'required' to \`false\` for all fields by default.
+9.  **IDs**: Ensure every field and sub-field has a unique 'id' generated using a UUID-like random string.
 
-Analyze the following JSON content which defines the schema structure:
+Analyze the following JSON content and generate the corresponding schema:
 \`\`\`json
 {{{jsonContent}}}
 \`\`\`
