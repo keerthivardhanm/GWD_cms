@@ -26,6 +26,7 @@ export async function generateSchemaFromJson(input: GenerateSchemaInput): Promis
 
 const prompt = ai.definePrompt({
   name: 'generateSchemaPrompt',
+  model: 'googleai/gemini-1.5-flash-latest',
   input: { schema: GenerateSchemaInputSchema },
   output: { schema: contentSchemaFormSchema },
   prompt: `You are an expert system designer who creates content management system (CMS) schemas. Your task is to analyze the provided JSON content, which describes the desired schema structure, and generate a valid schema object that can be used to represent this data.
