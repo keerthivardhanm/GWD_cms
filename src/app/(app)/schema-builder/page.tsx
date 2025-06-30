@@ -14,7 +14,7 @@ import { collection, getDocs, query, where, limit, doc, addDoc, updateDoc, delet
 import { useAuth } from "@/context/AuthContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SchemaForm, type ContentSchema, type ContentSchemaFormValues } from '@/components/forms/SchemaForm';
-import { generateSchemaFromJson } from '@/ai/flows/generate-schema-from-json-flow';
+import { generateSchemaFromHtml } from '@/ai/flows/generate-schema-from-json-flow'; // Keep file name, but function name is changed
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
@@ -30,7 +30,7 @@ export default function SchemaBuilderPage() {
   const [contentExistsMap, setContentExistsMap] = useState<Record<string, boolean>>({});
 
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-  const [jsonInput, setJsonInput] = useState("");
+  const [htmlInput, setHtmlInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
 
@@ -91,30 +91,32 @@ export default function SchemaBuilderPage() {
     setIsFormOpen(true);
   };
   
-  const handleGenerateSchemaFromJSON = async () => {
-    if (!jsonInput.trim()) {
-      toast({ title: "Error", description: "JSON content cannot be empty.", variant: "destructive" });
+  const handleGenerateSchemaFromHTML = async () => {
+    if (!htmlInput.trim()) {
+      toast({ title: "Error", description: "HTML content cannot be empty.", variant: "destructive" });
       return;
     }
     setIsGenerating(true);
     try {
-      const generatedSchema = await generateSchemaFromJson({ jsonContent: jsonInput });
+      // Call the new function with the new input structure
+      const generatedSchema = await generateSchemaFromHtml({ htmlContent: htmlInput });
       
       setEditingSchema(null); // Ensure we're in "create" mode
       setFormInitialData(generatedSchema);
       
       setIsImportDialogOpen(false);
       setIsFormOpen(true);
-      setJsonInput(''); // Clear input for next time
+      setHtmlInput(''); // Clear input for next time
       toast({ title: "Schema Generated!", description: "Review and save the AI-generated schema." });
 
     } catch (error) {
       console.error("AI Schema Generation Error:", error);
-      toast({ title: "AI Error", description: "Failed to generate schema from JSON. Please ensure the JSON is valid.", variant: "destructive" });
+      toast({ title: "AI Error", description: "Failed to generate schema from HTML. Please ensure the HTML contains a clear repeating structure.", variant: "destructive" });
     } finally {
       setIsGenerating(false);
     }
   };
+
 
   const handleSaveSchema = async (values: ContentSchemaFormValues) => {
     if (!user) {
@@ -156,7 +158,7 @@ export default function SchemaBuilderPage() {
         title="Schema Builder"
         description="Define and manage the structure of your content types."
         actions={<>
-            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}><Sparkles className="mr-2 h-4 w-4" /> Create from JSON (AI)</Button>
+            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}><Sparkles className="mr-2 h-4 w-4" /> Create from HTML (AI)</Button>
             <Button onClick={handleCreateNewSchema}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Create New Schema
             </Button>
@@ -180,7 +182,7 @@ export default function SchemaBuilderPage() {
               <List className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold mb-2">No Schemas Defined</h3>
               <p className="text-muted-foreground mb-4">
-                Get started by creating your first content schema or importing from JSON.
+                Get started by creating your first content schema or importing from HTML.
               </p>
               <Button onClick={handleCreateNewSchema}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Create First Schema
@@ -301,26 +303,26 @@ export default function SchemaBuilderPage() {
       <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Create Schema from JSON (AI)</DialogTitle>
+            <DialogTitle>Create Schema from HTML (AI)</DialogTitle>
             <DialogDescription>
-              Paste a JSON object below. The AI will analyze its structure and generate a content schema for you to review and save.
+              Paste an HTML snippet containing a list of items (like jobs, products, etc.). The AI will analyze its structure and generate a content schema for you.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <div>
-              <Label htmlFor="json-input">JSON Content</Label>
+              <Label htmlFor="html-input">HTML Content</Label>
               <Textarea 
-                id="json-input"
-                placeholder='{ "title": "Example", "author": "AI" }'
-                value={jsonInput}
-                onChange={(e) => setJsonInput(e.target.value)}
+                id="html-input"
+                placeholder='<div class="item"><p>Example</p></div>\n<div class="item"><p>Another</p></div>'
+                value={htmlInput}
+                onChange={(e) => setHtmlInput(e.target.value)}
                 rows={10}
                 className="font-mono text-xs"
               />
             </div>
-            <Button onClick={handleGenerateSchemaFromJSON} disabled={isGenerating} className="w-full">
+            <Button onClick={handleGenerateSchemaFromHTML} disabled={isGenerating} className="w-full">
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4"/>}
-              {isGenerating ? "Analyzing..." : "Generate Schema"}
+              {isGenerating ? "Analyzing HTML..." : "Generate Schema"}
             </Button>
           </div>
         </DialogContent>

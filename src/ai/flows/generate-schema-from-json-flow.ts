@@ -1,11 +1,12 @@
 
 'use server';
 /**
- * @fileOverview An AI flow to generate a content schema from a JSON object.
+ * @fileOverview An AI flow to generate a content schema from an HTML snippet.
+ * This has been updated from the previous JSON-based generation to be more powerful.
  *
- * - generateSchemaFromJson - A function that handles the schema generation process.
- * - GenerateSchemaInput - The input type for the generateSchemaFromJson function.
- * - GenerateSchemaOutput - The return type for the generateSchemaFromJson function.
+ * - generateSchemaFromHtml - A function that handles the schema generation process from HTML.
+ * - GenerateSchemaInput - The input type for the generateSchemaFromHtml function.
+ * - GenerateSchemaOutput - The return type for the generateSchemaFromHtml function.
  */
 
 import { ai } from '@/ai/genkit';
@@ -13,64 +14,76 @@ import { z } from 'genkit';
 import { contentSchemaFormSchema } from '@/components/forms/SchemaForm';
 
 const GenerateSchemaInputSchema = z.object({
-  jsonContent: z.string().describe('A JSON string representing the data structure to create a schema from.'),
+  htmlContent: z.string().describe('An HTML snippet containing a list of repeating elements (e.g., a list of products, jobs, or articles).'),
 });
 export type GenerateSchemaInput = z.infer<typeof GenerateSchemaInputSchema>;
 
 export type GenerateSchemaOutput = z.infer<typeof contentSchemaFormSchema>;
 
 
-export async function generateSchemaFromJson(input: GenerateSchemaInput): Promise<GenerateSchemaOutput> {
+export async function generateSchemaFromHtml(input: GenerateSchemaInput): Promise<GenerateSchemaOutput> {
   return generateSchemaFlow(input);
 }
 
 const prompt = ai.definePrompt({
-  name: 'generateSchemaPrompt',
+  name: 'generateSchemaFromHtmlPrompt',
   model: 'googleai/gemini-1.5-flash-latest',
   input: { schema: GenerateSchemaInputSchema },
   output: { schema: contentSchemaFormSchema },
-  prompt: `You are an expert system designer who creates content management system (CMS) schemas. Your task is to analyze the provided JSON content and generate a valid schema object that can be used to represent this data.
+  prompt: `You are an expert CMS architect who specializes in reverse-engineering HTML to create structured content schemas. Your task is to analyze the provided HTML snippet and generate a comprehensive schema object that can be used to dynamically manage its content in a headless CMS.
 
-The JSON can be in one of two formats:
-1.  **Flat Object**: A simple dictionary where each key is a field name and the value is a string describing the data type.
-2.  **Nested Array Object**: An object with a single key, where the value is an array containing a sample object. This represents a list of items, and you should create a 'repeater' field for it.
+Follow these rules with extreme precision:
 
-Follow these rules precisely:
-1.  **Schema Name and Description**:
-    *   For a **Flat Object**, infer a descriptive 'name' and 'description' from the field names (e.g., "title", "author" -> "Blog Post").
-    *   For a **Nested Array Object** (e.g., \`{"jobs": [...]}\`), use the array's key ("jobs") to create the schema name (e.g., "Jobs").
-2.  **Slug**: Create a URL-friendly 'slug' from the schema name. It must be lowercase, alphanumeric, with words separated by hyphens (e.g., 'blog-post', 'jobs').
-3.  **Field Generation**:
-    *   For a **Flat Object**, create a 'fields' array where each item corresponds to a key-value pair in the JSON.
-    *   For a **Nested Array Object**, create a 'fields' array with a *single field* of type \`repeater\`. The \`name\` and \`label\` of this repeater should come from the JSON key (e.g., "jobs"). The sub-fields of this repeater should be generated from the keys of the first object inside the array.
-4.  **Field Filtering**: **Crucially, ignore any JSON keys that end with \`_class\`, \`_icon_class\`, or contain the word 'button'.** These are presentational details and should not be part of the data schema.
-5.  **Field Naming**: For each field or sub-field, the 'name' must be the original JSON key.
-6.  **Field Labels**: The 'label' should be a human-readable version of the key (e.g., "job_title" becomes "Job Title").
-7.  **Field Types**: Determine the 'type' for each field by interpreting its string value from the JSON:
-    *   If the value is \`string (URL)\` or \`string (Image URL)\`, the type should be \`image_url\`.
-    *   If the value is \`string\` and the key suggests long content (e.g., \`description\`, \`bio\`, \`content\`), the type should be \`textarea\`. Otherwise, it should be \`text\`.
-    *   If the value is \`number\`, the type should be \`number\`.
-    *   If the value is \`boolean\`, the type should be \`boolean\`.
-8.  **Required**: Set 'required' to \`false\` for all fields by default.
-9.  **IDs**: Ensure every field and sub-field has a unique 'id' generated using a UUID-like random string.
+1.  **Identify the Primary Repeater**: Analyze the HTML to find the main repeating element that represents a single item in a list (e.g., a \`div.job-bar\`, an \`li.product-card\`). All sub-fields will be based on the contents of this single repeating element.
 
-Analyze the following JSON content and generate the corresponding schema:
-\`\`\`json
-{{{jsonContent}}}
+2.  **Schema Name and Slug**:
+    *   Infer a descriptive 'name' for the entire schema from the context of the HTML (e.g., "Jobs Listing", "Product Catalog").
+    *   Create a URL-friendly 'slug' from the schema name (e.g., 'jobs-listing', 'product-catalog').
+
+3.  **Create a Single Repeater Field**:
+    *   The top-level \`fields\` array of the schema must contain exactly ONE field.
+    *   This field's type must be \`repeater\`.
+    *   The \`name\` of this repeater field should be a plural version of the item it contains (e.g., "jobs", "products", "articles").
+    *   The \`label\` should be a human-readable version of the name (e.g., "Jobs", "Products").
+
+4.  **Extract All Sub-Fields for the Repeater**:
+    *   Carefully examine the FIRST instance of the repeating element and create a sub-field for EVERY piece of data. Do not omit any details.
+    *   **Source from \`data-` attributes**: If an element has a \`data-job\` or similar attribute containing a JSON object, create a sub-field for EACH key inside that JSON object. For example, \`data-job='{"title":"Radiographer", "desc":"..."}'\` must result in sub-fields named \`title\` and \`desc\`.
+    *   **Source from text content**: Extract text from elements like \`<span>\` or \`<h2>\`. Use the element's class or context to create a logical field name. For example, \`<span class="job-role">Radiographer</span>\` should become a sub-field named \`job_role\`.
+    *   **Source from attributes**: Extract data from attributes, such as the \`src\` of an \`<img>\` tag.
+    *   **Capture ALL class names**: Create sub-fields to store CSS classes for styling. For example, \`<div class="job-bar">\` should result in a field like \`job_container_class\` with a default value of "job-bar". Similarly, \`<i class="fas fa-map-marker-alt">\` should create a field like \`location_icon_class\`. Be thorough.
+
+5.  **Field Naming and Labeling**:
+    *   The 'name' for each sub-field must be logical, lowercase, and use snake_case (e.g., \`job_title\`, \`image_url\`, \`icon_class\`).
+    *   The 'label' should be a human-readable, Title Case version of the name (e.g., "Job Title", "Image URL").
+
+6.  **Field Type Inference**:
+    *   If a value is clearly a URL (especially for an image), set the 'type' to \`image_url\`.
+    *   If a field is for a long piece of text (like a description), set the 'type' to \`textarea\`.
+    *   If a value from a data attribute is a boolean (\`true\`/\`false\`), set the 'type' to \`boolean\`.
+    *   For all other text-based content (including CSS classes), use the 'type' \`text\`.
+
+7.  **IDs and Defaults**:
+    *   Ensure every field and sub-field has a unique 'id' (generate a random UUID-like string).
+    *   Set 'required' to \`false\` for all fields.
+
+Analyze the following HTML snippet and generate the corresponding schema. Be meticulous.
+\`\`\`html
+{{{htmlContent}}}
 \`\`\`
   `,
 });
 
 const generateSchemaFlow = ai.defineFlow(
   {
-    name: 'generateSchemaFlow',
+    name: 'generateSchemaFromHtmlFlow',
     inputSchema: GenerateSchemaInputSchema,
     outputSchema: contentSchemaFormSchema,
   },
   async (input) => {
     const { output } = await prompt(input);
     if (!output) {
-      throw new Error('AI failed to generate a valid schema.');
+      throw new Error('AI failed to generate a valid schema from the HTML.');
     }
     // Ensure all fields and subfields have a unique ID, as the model might forget.
     const ensureIds = (fields: any[]): any[] => {
