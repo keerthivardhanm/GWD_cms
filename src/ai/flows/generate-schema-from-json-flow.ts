@@ -48,7 +48,7 @@ Follow these rules with extreme precision:
 
 4.  **Extract All Sub-Fields for the Repeater**:
     *   Carefully examine the FIRST instance of the repeating element and create a sub-field for EVERY piece of data. Do not omit any details.
-    *   **Source from \`data-` attributes**: If an element has a \`data-job\` or similar attribute containing a JSON object, create a sub-field for EACH key inside that JSON object. For example, \`data-job='{"title":"Radiographer", "desc":"..."}'\` must result in sub-fields named \`title\` and \`desc\`.
+    *   **Source from \`data-*\` attributes**: If an element has a \`data-job\` or similar attribute containing a JSON object, create a sub-field for EACH key inside that JSON object. For example, \`data-job='{"title":"Radiographer", "desc":"..."}'\` must result in sub-fields named \`title\` and \`desc\`.
     *   **Source from text content**: Extract text from elements like \`<span>\` or \`<h2>\`. Use the element's class or context to create a logical field name. For example, \`<span class="job-role">Radiographer</span>\` should become a sub-field named \`job_role\`.
     *   **Source from attributes**: Extract data from attributes, such as the \`src\` of an \`<img>\` tag.
     *   **Capture ALL class names**: Create sub-fields to store CSS classes for styling. For example, \`<div class="job-bar">\` should result in a field like \`job_container_class\` with a default value of "job-bar". Similarly, \`<i class="fas fa-map-marker-alt">\` should create a field like \`location_icon_class\`. Be thorough.
@@ -61,7 +61,7 @@ Follow these rules with extreme precision:
     *   If a value is clearly a URL (especially for an image), set the 'type' to \`image_url\`.
     *   If a field is for a long piece of text (like a description), set the 'type' to \`textarea\`.
     *   If a value from a data attribute is a boolean (\`true\`/\`false\`), set the 'type' to \`boolean\`.
-    *   For all other text-based content (including CSS classes), use the 'type' \`text\`.
+    *   For all other text-based content (including CSS classes), use the 'type' to \`text\`.
 
 7.  **IDs and Defaults**:
     *   Ensure every field and sub-field has a unique 'id' (generate a random UUID-like string).
