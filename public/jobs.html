@@ -9,10 +9,14 @@
         body { font-family: sans-serif; background-color: #f9f9f9; color: #333; margin: 0; padding: 2rem; }
         .container { max-width: 900px; margin: auto; background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #1a237e; }
-        .search-container { margin-bottom: 2rem; }
-        .search-container input { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; box-sizing: border-box; }
+        
+        .filters-container { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        .filter-input, .filter-select { padding: 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; flex-grow: 1; min-width: 150px; }
+        .reset-btn { padding: 0.75rem 1.5rem; border: none; background-color: #6c757d; color: white; border-radius: 4px; cursor: pointer; transition: background-color 0.3s; }
+        .reset-btn:hover { background-color: #5a6268; }
+
         .jobs-bar-list { display: flex; flex-direction: column; gap: 1rem; }
-        .job-bar { display: grid; grid-template-columns: 2fr 1fr 2fr 1fr 1fr 1fr; align-items: center; padding: 1rem; border: 1px solid #ddd; border-radius: 6px; background-color: #fff; transition: box-shadow 0.3s; }
+        .job-bar { display: grid; grid-template-columns: 2fr 1fr 2fr 1fr 1fr 1fr; align-items: center; padding: 1rem; border: 1px solid #ddd; border-radius: 6px; background-color: #fff; transition: box-shadow 0.3s, opacity 0.3s; }
         .job-bar:hover { box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .job-flag-title { display: flex; align-items: center; gap: 8px; font-weight: bold; }
         .job-flag { width: 28px; height: 18px; border-radius: 3px; box-shadow: 0 1px 2px #ccc; }
@@ -39,6 +43,7 @@
         @media (max-width: 768px) {
             .job-bar { grid-template-columns: 1fr; gap: 0.5rem; text-align: left; }
             .job-country { display: none; }
+            .filters-container { flex-direction: column; }
         }
     </style>
     <!-- Font Awesome for icons -->
@@ -49,11 +54,19 @@
     <section class="jobs-listing-section" id="jobs-listing">
         <div class="container">
             <h1>Current Openings</h1>
-            <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Search by title, location, or role...">
+            
+            <div class="filters-container">
+                <input type="text" id="searchInput" placeholder="Search by title, role..." class="filter-input">
+                <select id="locationFilter" class="filter-select">
+                    <option value="">All Locations</option>
+                </select>
+                <select id="experienceFilter" class="filter-select">
+                    <option value="">All Experience Levels</option>
+                </select>
+                <button id="resetFilters" class="reset-btn">Reset</button>
             </div>
+            
             <div class="jobs-bar-list" id="jobsList">
-                <!-- Job listings will be dynamically inserted here -->
                 <div id="loader" class="loader"></div>
             </div>
         </div>
@@ -71,10 +84,10 @@
     </div>
 
     <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 
     <!-- Your custom renderer script -->
-    <script src="jobs.js"></script>
+    <script src="/jobs.js"></script>
 </body>
 </html>
